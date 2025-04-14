@@ -22,13 +22,6 @@ std::atomic<uintptr_t> lastState{ 0 };
 std::atomic<uintptr_t> lastPlaceId{ 0 };
 std::atomic<bool> teleportMonitoringActive{ true };
 
-extern "C" __declspec(dllexport) LRESULT InitHook(int Code, WPARAM WParam, LPARAM LParam) {
-    StartServer();
-    return CallNextHookEx(nullptr, Code, WParam, LParam);
-}
-
-
-
 uintptr_t GlobalState() {
     auto ScriptContext = RBX::Scheduler->GetScriptContext();
     uintptr_t GlobalState = ScriptContext + Update::ScriptContext::GlobalState;
@@ -215,7 +208,8 @@ void InitializeExploitation() {
         lastPlaceId.store(placeId);
         lastState.store(GlobalState());
     }
-
+    
+    StartServer();
     std::thread(monitor_teleport).detach();
 
     while (true) {
