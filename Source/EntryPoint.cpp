@@ -1,4 +1,4 @@
-﻿#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <Environment/Environment.hpp>
 #include "Scheduler/Scheduler.hpp"
@@ -21,6 +21,7 @@
 std::atomic<uintptr_t> lastState{ 0 };
 std::atomic<uintptr_t> lastPlaceId{ 0 };
 std::atomic<bool> teleportMonitoringActive{ true };
+
 
 uintptr_t GlobalState() {
     auto ScriptContext = RBX::Scheduler->GetScriptContext();
@@ -208,7 +209,7 @@ void InitializeExploitation() {
         lastPlaceId.store(placeId);
         lastState.store(GlobalState());
     }
-    
+
     StartServer();
     std::thread(monitor_teleport).detach();
 
