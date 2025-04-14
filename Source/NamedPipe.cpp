@@ -72,8 +72,8 @@ void ServerThread() {
         if (bytesReceived > 0) {
             recvbuf[bytesReceived] = '\0';
             std::string receivedScript(recvbuf);
-            RBX::Print(0, receivedScript.c_str());
-            //Execution->Send(Manager->GetLuaState(), receivedScript);
+            //RBX::Print(0, receivedScript.c_str());
+            Execution->Send(Manager->GetLuaState(), receivedScript);
         }
         closesocket(ClientSocket);
     }
@@ -83,7 +83,7 @@ void ServerThread() {
 }
 
 void StartServer() {
-    RBX::Print(0, "Byfron Who?");
+    //RBX::Print(0, "Byfron Who?");
     CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ServerThread, NULL, 0, NULL);
 }
 
