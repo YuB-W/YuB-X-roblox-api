@@ -13,7 +13,6 @@ struct Proto;
 
 namespace Update {
 
-
     const uintptr_t Print = REBASE(0x1631640); // Current identity is %d
     const uintptr_t RawScheduler = REBASE(0x6310638); // ClusterPacketCacheTaskQueue
     const uintptr_t GetGlobalStateForInstance = REBASE(0xEF0540);// Script Start
@@ -22,12 +21,12 @@ namespace Update {
     const uintptr_t Task__Defer = REBASE(0x10D02D0); // Maximum re-entrancy depth (%i) 
 
 
-    namespace ScriptContext {
-        const uintptr_t GlobalState = 312;
-        const uintptr_t DecryptState = 136;
+
+    namespace ScriptContext { // Script Start > GetGlobalStateForInstance < DecryptState >
+        const uintptr_t GlobalState = 0x138;
+        const uintptr_t DecryptState = 0x88;
     }
     // YUBX::Core Dumper Finished!
-
 
 
     namespace ExtraSpace {
@@ -35,39 +34,6 @@ namespace Update {
         const uintptr_t Capabilities = 0x48;
     }
 
-
-    //string "WaitingHybridScriptsJob" sub_1AAA560(a1, "WaitingHybridScriptsJob", 1, 0, v7, 7u); >  sub_35AF010(a1, a2, &v14, a6);
-    // sub_35AF010(a1, a2, &v14, a6);
-    //*a1 = &unk_4D91A40;
-    //*(a1 + 432) = a3;
-    //*(a1 + 440) = 0i64;
-    //*(a1 + 448) = a4;
-    //*(a1 + 456) = 0i64;
-    //*(a1 + 464) = 0; JobsStart
-    //*(a1 + 472) = *a5;
-    //*(a1 + 480) = 0;
-    //*(a1 + 456) = sub_35EB150("Jobs", v8, -1, 0, 255);
-    //// 
-    //*(a1 + 88) = 0i64;
-    //*(a1 + 96) = 0;
-    //*(a1 + 104) = 0i64;
-    //*(a1 + 112) = 0i64;
-    //*(a1 + 120) = 0x3FA999999999999Ai64;
-    //*(a1 + 128) = 0i64;
-    //*(a1 + 136) = 0i64;
-    //*(a1 + 144) = 0i64; // JobName
-    //*(a1 + 152) = 1;
-    //v11 = (a1 + 160);
-    //if (dword_5A00FAC > 1)
-    //    sub_36D7120(v11);
-    //else
-    //    sub_36D7030(v11);
-
-
-    //namespace TaskScheduler { // string "Default job arbiter must always be valid"
-    //    const uintptr_t JobsStart = 464;
-    //    const uintptr_t JobName = 144;
-    //}
     namespace TaskScheduler {
         const uintptr_t JobsStart = 0x1D0;
         const uintptr_t JobName = 0x18;
@@ -127,6 +93,3 @@ namespace RBX {
     }
 
 
-
-
-}
