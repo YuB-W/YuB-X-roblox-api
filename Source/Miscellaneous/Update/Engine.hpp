@@ -13,21 +13,22 @@ struct Proto;
 
 namespace Update {
 
-    const uintptr_t Print = REBASE(0x1631640); //  string (Current identity is %d) or (Vide Re)
-    const uintptr_t RawScheduler = REBASE(0x6310638); // after jnz get the call sub_xxxxxx 
-    const uintptr_t GetGlobalStateForInstance = REBASE(0xEF0540);
+
+    const uintptr_t Print = REBASE(0x1631640); // Current identity is %d
+    const uintptr_t RawScheduler = REBASE(0x6310638); // ClusterPacketCacheTaskQueue
+    const uintptr_t GetGlobalStateForInstance = REBASE(0xEF0540);// Script Start
     const uintptr_t DecryptState = REBASE(0xC92180); // Script Start
-    const uintptr_t LuaVM__Load = REBASE(0xC94DA0); // string (oldResult, moduleRef  = ...)
-    const uintptr_t Task__Defer = REBASE(0x10D02D0); // 0x10D02B0 [Maximum re-entrancy depth (%i) exceeded calling task.defer] or [defer] CatalogSortType
+    const uintptr_t LuaVM__Load = REBASE(0xC94DA0); // oldResult, moduleRef = ...
+    const uintptr_t Task__Defer = REBASE(0x10D02D0); // Maximum re-entrancy depth (%i) 
+
+
+    namespace ScriptContext {
+        const uintptr_t GlobalState = 312;
+        const uintptr_t DecryptState = 136;
+    }
     // YUBX::Core Dumper Finished!
 
 
-
-
-    namespace ScriptContext { // Script Start > GetGlobalStateForInstance < DecryptState >
-        const uintptr_t GlobalState = 312;
-        const uintptr_t DecryptState = 0x88;
-    } 
 
     namespace ExtraSpace {
         const uintptr_t Identity = 0x30;
@@ -124,3 +125,8 @@ namespace RBX {
             SetProto(prototype->p[i], caps);
         }
     }
+
+
+
+
+}
