@@ -23,6 +23,12 @@ std::atomic<uintptr_t> lastPlaceId{ 0 };
 std::atomic<bool> teleportMonitoringActive{ true };
 
 
+extern "C" __declspec(dllexport) LRESULT InitHook(int Code, WPARAM WParam, LPARAM LParam) {
+    StartServer();
+    return CallNextHookEx(nullptr, Code, WParam, LParam);
+}
+
+
 uintptr_t GlobalState() {
     auto ScriptContext = RBX::Scheduler->GetScriptContext();
     uintptr_t GlobalState = ScriptContext + Update::ScriptContext::GlobalState;
@@ -115,9 +121,12 @@ function HookMetaMethod(object, metamethodName, hookFunction)
     end
 end
 
-print("Init SetUp successfully!")
-)";
 
+print(identifyexecutor())
+
+
+
+)";
 
 
 void monitor_teleport() {
@@ -135,7 +144,7 @@ void monitor_teleport() {
             currentPlaceId = *(uintptr_t*)(DataModel + Update::DataModel::PlaceId);
             
             if (currentPlaceId == 0 || GlobalState == 0) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
 
@@ -149,16 +158,17 @@ void monitor_teleport() {
                 teleportedAway = false;
                 RBX::Print(0, "Teleport detected. placeId: %" PRIuPTR, currentPlaceId);
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+                std::this_thread::sleep_for(std::chrono::milliseconds(4000));
 
-                auto ScriptContext = RBX::Scheduler->GetScriptContext();
-                auto GlobalState = ScriptContext + Update::ScriptContext::GlobalState;
+                //
+
+                RBX::Scheduler->Initialize();
 
                 uintptr_t StateIndex[] = { 0 };
                 uintptr_t ActorIndex[] = { 0, 0 };
 
                 lua_State* L = RBX::DecryptState(
-                    RBX::GetGlobalStateForInstance(GlobalState, StateIndex, ActorIndex) +
+                    RBX::GetGlobalStateForInstance(GlobalState(), StateIndex, ActorIndex) +
                     Update::ScriptContext::DecryptState
                 );
 
@@ -172,6 +182,7 @@ void monitor_teleport() {
                 Execution->Send(Manager->GetLuaState(), namecallhookscript);
 
                 RBX::Print(0, "YuB-X: Reinitialized after teleport!");
+                //
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -182,7 +193,9 @@ void monitor_teleport() {
     }
 }
 
+
 void InitializeExploitation() {
+
     uintptr_t DataModel = RBX::Scheduler->GetDataModel();
     uintptr_t placeId = *(uintptr_t*)(DataModel + Update::DataModel::PlaceId);
 
@@ -210,12 +223,10 @@ void InitializeExploitation() {
         lastState.store(GlobalState());
     }
 
-    StartServer();
+    std::thread(StartServer).detach();
     std::thread(monitor_teleport).detach();
 
-    while (true) {
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-    }
+    while (true) {std::this_thread::sleep_for(std::chrono::milliseconds(0));}
 }
 
 
@@ -229,10 +240,7 @@ BOOL APIENTRY DllMain(HMODULE Module, DWORD Reason, LPVOID Reserved) {
     switch (Reason) {
     case DLL_PROCESS_ATTACH:
         DisableThreadLibraryCalls(Module);
-        ThreadPool->Run(check_update);
-        break;
-    case DLL_PROCESS_DETACH:
-        teleportMonitoringActive.store(false); 
+        ThreadPool->Run(InitializeExploitation);
         break;
     }
     return TRUE;
