@@ -4,16 +4,9 @@
 #include <cstdint>
 #include <string>
 
-/*
-              SET                                 GET
-    VMValue0: Data = Value                     || Value = Data
-    VMValue1: Data = (Value + (Data + Offset)) || Value = (Data - (Value + Offset))
-    VMValue2: Data = ((Data + Offset) - Value) || Value = ((v + Offset) - Data)
-    VMValue3: Data = (Value ^ (Data + Offset)) || Value = ((v + Offset) ^ Data)
-    VMValue4: Data = (Value - (Data + Offset)) || Value = ((v + Offset) + Data)
-*/
-
-template <typename T> struct VMValue1 {
+template <typename T>
+struct vmval1
+{
 private:
     T Storage;
 public:
@@ -38,7 +31,9 @@ public:
     }
 };
 
-template <typename T> struct VMValue2 {
+template <typename T>
+struct vmval2
+{
 private:
     T Storage;
 public:
@@ -63,7 +58,9 @@ public:
     }
 };
 
-template <typename T> struct VMValue3 {
+template <typename T>
+struct vmval3
+{
 private:
     T Storage;
 public:
@@ -88,7 +85,9 @@ public:
     }
 };
 
-template <typename T> struct VMValue4 {
+template <typename T>
+struct vmval4
+{
 private:
     T Storage;
 public:
@@ -112,3 +111,12 @@ public:
         operator=(Value);
     }
 };
+
+template <typename T>
+struct unwrap_vmvalue
+{
+    using type = T;
+};
+
+template <typename T>
+using vmval0 = typename unwrap_vmvalue<T>::type;
