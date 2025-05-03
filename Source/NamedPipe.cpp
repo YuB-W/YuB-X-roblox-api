@@ -2,48 +2,51 @@
 #include <ws2tcpip.h>
 #include <iostream>
 #include <string>
+#include <vector>
+#include <mutex>
 #include "RBX.hpp"
 #include "Scheduler/Scheduler.hpp"
 #include <Environment/Environment.hpp>
 
-
 #pragma comment(lib, "ws2_32.lib")
 
 #define PORT "5454"
-#define BUFFER_SIZE 8192
+
+bool recvAll(SOCKET sock, char* buffer, int totalBytes) {
+    int received = 0;
+    while (received < totalBytes) {
+        int result = recv(sock, buffer + received, totalBytes - received, 0);
+        if (result <= 0) return false;
+        received += result;
+    }
+    return true;
+}
 
 void ServerThread() {
     WSADATA wsaData;
-    struct addrinfo* result = NULL, hints = {};
+    struct addrinfo* result = nullptr, hints = {};
     SOCKET ListenSocket = INVALID_SOCKET, ClientSocket = INVALID_SOCKET;
-    char recvbuf[BUFFER_SIZE];
 
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        std::cerr << "WSAStartup failed" << std::endl;
-        return;
-    }
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) return;
 
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = AI_PASSIVE;
 
-    if (getaddrinfo(NULL, PORT, &hints, &result) != 0) {
-        std::cerr << "getaddrinfo failed" << std::endl;
+    if (getaddrinfo(nullptr, PORT, &hints, &result) != 0) {
         WSACleanup();
         return;
     }
 
     ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
     if (ListenSocket == INVALID_SOCKET) {
-        std::cerr << "Socket creation failed" << std::endl;
         freeaddrinfo(result);
         WSACleanup();
         return;
     }
 
     if (bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR) {
-        std::cerr << "Bind failed" << std::endl;
         closesocket(ListenSocket);
         freeaddrinfo(result);
         WSACleanup();
@@ -53,28 +56,43 @@ void ServerThread() {
     freeaddrinfo(result);
 
     if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR) {
-        std::cerr << "Listen failed" << std::endl;
         closesocket(ListenSocket);
         WSACleanup();
         return;
     }
 
+    RBX::Print(0, "[YuB-X] Listening on port " PORT "...");
+
     while (true) {
-        ClientSocket = accept(ListenSocket, NULL, NULL);
-        if (ClientSocket == INVALID_SOCKET) {
-            std::cerr << "Accept failed" << std::endl;
-            closesocket(ListenSocket);
-            WSACleanup();
-            return;
+        ClientSocket = accept(ListenSocket, nullptr, nullptr);
+        if (ClientSocket == INVALID_SOCKET) continue;
+
+        uint32_t scriptSizeNet = 0;
+        if (!recvAll(ClientSocket, reinterpret_cast<char*>(&scriptSizeNet), 4)) {
+            closesocket(ClientSocket);
+            continue;
         }
 
-        int bytesReceived = recv(ClientSocket, recvbuf, BUFFER_SIZE - 1, 0);
-        if (bytesReceived > 0) {
-            recvbuf[bytesReceived] = '\0';
-            std::string receivedScript(recvbuf);
-            //RBX::Print(0, receivedScript.c_str());
-            Execution->Send(Manager->GetLuaState(), receivedScript);
+        uint32_t scriptSize = ntohl(scriptSizeNet);
+        if (scriptSize == 0 || scriptSize > 10 * 1024 * 1024) {
+            closesocket(ClientSocket);
+            continue;
         }
+
+        std::vector<char> buffer(scriptSize + 1, 0);
+        if (!recvAll(ClientSocket, buffer.data(), scriptSize)) {
+            closesocket(ClientSocket);
+            continue;
+        }
+
+        std::string receivedScript(buffer.data(), scriptSize);
+          lua_State* L = Manager->GetLuaState();
+          if (L) {
+              Execution->Send(L, script);
+          }
+          else {
+              RBX::Print(0, "[YuB-X] ❌ Failed to execute: no valid Lua state");
+          }
         closesocket(ClientSocket);
     }
 
@@ -83,7 +101,5 @@ void ServerThread() {
 }
 
 void StartServer() {
-    //RBX::Print(0, "Byfron Who?");
-    CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ServerThread, NULL, 0, NULL);
+    ServerThread();
 }
-
