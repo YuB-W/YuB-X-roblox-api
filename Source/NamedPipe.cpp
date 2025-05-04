@@ -88,7 +88,7 @@ void ServerThread() {
         std::string receivedScript(buffer.data(), scriptSize);
           lua_State* L = Manager->GetLuaState();
           if (L) {
-              Execution->Send(L, script);
+              Execution->Send(L, receivedScript);
           }
           else {
               RBX::Print(0, "[YuB-X] ❌ Failed to execute: no valid Lua state");
