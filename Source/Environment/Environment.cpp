@@ -1,4 +1,4 @@
-﻿#include "Environment.hpp"
+#include "Environment.hpp"
 
 // UNC INCLUDES
 #include "Closure/Closure.hpp"
@@ -14,12 +14,15 @@
 #include <WinUser.h>
 #include "ResourceManager.hpp"
 
+#include "Library.hpp"
 
-static const auto TargetTerm = "base";
 
 
 
 void CEnvironment::Initialize(lua_State* L) {
+
+    
+    //api::Environment::Debug::RegisterFunctions(L);
 
     api::Environment::Script::Register(L); // getgenv, **getrenv**, getnamecallmethod, compareinstances, getgc §HttpGet§
     api::Environment::FileSystem::Register(L); // writefile, readfile, deletefile, makefolder, appendfile, isfolder, isfile
@@ -32,9 +35,28 @@ void CEnvironment::Initialize(lua_State* L) {
     api::Environment::Instance::Register(L); // DISABLED: no pushinstance offset required.
     api::Environment::Http::Register(L); // httpGet
 
-    lua_newtable(L);
-    lua_setglobal(L, "_G");
+    const auto rL = lua_newthread(L);
+    lua_ref(L, -1);
+    lua_pop(L, 1);
 
     lua_newtable(L);
-    lua_setglobal(L, "shared");
+    lua_setglobal(L, xorstr_("_G"));
+    lua_getglobal(L, xorstr_("_G"));
+    lua_setglobal(L, xorstr_("shared"));
+
+    lua_pushvalue(L, LUA_GLOBALSINDEX);
+    lua_setglobal(L, xorstr_("_ENV"));
+
+    const auto nL = lua_newthread(L);
+    lua_ref(L, -1);
+    lua_pop(L, 1);
+
+    luaL_sandboxthread(nL);
+
+    lua_newtable(nL);
+    lua_setglobal(nL, "_G");
+
+    lua_newtable(nL);
+    lua_setglobal(nL, "shared");
+
 }
