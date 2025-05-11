@@ -7,8 +7,12 @@
 #include <Luau/Compiler.h>
 #include "../../../Dependencies/Luau/VM/src/lfunc.h"
 #include <lua.h>
+#include <Environment/Library.hpp>
+#include <unordered_set>
+#include <Environment/Environment.hpp>
 
 std::map<Closure*, int> ClMap{};
+std::unordered_map<Closure*, __int64> CClosures;
 #define xorstr_(str) (str)
 #undef LoadString 
 #define RegisterFunction(L, Func, Name) lua_pushcclosure(L, Func, Name, 0); lua_setglobal(L, Name);
@@ -37,46 +41,108 @@ int CloneFunction(lua_State* L) {
     return 1;
 }
 
-static uintptr_t MaxCapabilities = 0x200000000000003FLL | 0x3FFFFFF00LL;
-
 
 int ExecuteCaptured(lua_State* L)
 {
-    const char* code = lua_tostring(L, lua_upvalueindex(1)); 
+    const char* code = lua_tostring(L, lua_upvalueindex(1));
     if (!code)
     {
-        luaL_error(L, "No code found in upvalue.");
+        luaL_error(L, ObfStr("No code found in upvalue."));
         return 0;
     }
 
     if (Execution && Manager)
     {
-        Execution->Send(Manager->GetLuaState(), code); 
+        Execution->Send(Manager->GetLuaState(), code);
     }
     else
     {
-        luaL_error(L, "Invalid Execution or Manager state.");
+        luaL_error(L, ObfStr("Invalid Execution or Manager state."));
     }
     return 0;
 }
 
+inline std::string random_string(std::size_t length) {
+    auto randchar = []() -> char {
+        const char charset[] =
+            "0123456789"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz";
+        const std::size_t max_index = (sizeof(charset) - 1);
+        return charset[rand() % max_index];
+        };
 
-int Loadstring(lua_State* L)
+    std::string str(length, 0);
+    std::generate_n(str.begin(), length, randchar);
+    return str;
+};
+
+bool IsLuauBytecode(const char* data, size_t len)
 {
-    const char* code = luaL_checkstring(L, 1);
+    if (len >= 3 &&
+        static_cast<unsigned char>(data[0]) == 0x1B &&
+        data[1] == 'L' &&
+        data[2] == 'u')
+        return true;
 
-    if (!code)
-    {
-        luaL_error(L, "Invalid code string.");
-        return 0;
+    if (len >= 1 && static_cast<unsigned char>(data[0]) == 0x1B)
+        return true;
+
+    return false;
+}
+
+int loadstring(lua_State* L) {
+    luaL_checktype(L, 1, LUA_TSTRING);
+
+    size_t len = 0;
+    const char* src = luaL_checklstring(L, 1, &len);
+    const char* chunkname = (lua_gettop(L) >= 2 && lua_type(L, 2) == LUA_TSTRING)
+        ? lua_tostring(L, 2)
+        : "@loadstring";
+
+    // Block Luau bytecode
+    if (IsLuauBytecode(src, len)) {
+
+        lua_pushnil(L);
+        lua_pushstring(L, "Luau bytecode is not loadable");
+        return 2;
     }
 
-    lua_pushstring(L, code);
+    std::string source(src, len);
+    std::string bytecode;
 
-    lua_pushcclosure(L, ExecuteCaptured, "ExecuteCapturedClosure", 1); 
+    try {
+        bytecode = Execution->CompileScript(source);
+    }
+    catch (const std::exception& e) {
+        lua_pushnil(L);
+        lua_pushstring(L, e.what());
+        return 2;
+    }
+    catch (...) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Unknown compilation error");
+        return 2;
+    }
 
-    return 1;
+    int result = RBX::LuaVM__Load(L, &bytecode, chunkname, 0);
+    if (result == LUA_OK) {
+        Closure* cl = (Closure*)lua_topointer(L, -1);
+        if (cl && cl->l.p) {
+            static uintptr_t MaxCaps = 0xFFFFFFFFFFFFFFFF;
+            RBX::SetProto(cl->l.p, &MaxCaps);
+        }
+        return 1;
+    }
+
+    const char* err = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_pushnil(L);
+    lua_pushstring(L, err ? err : "Unknown error during load");
+    return 2;
 }
+
 
 
 int CheckCaller(lua_State* L) {
@@ -98,7 +164,7 @@ int NewCCHandler(lua_State* L) {
     int Result = lua_pcall(L, Args, LUA_MULTRET, 0);
     if (Result != 0) {
         auto Error = lua_tostring(L, -1);
-        if (Error == "attempt to yield across metamethod/C-call boundary") {
+        if (Error == ObfStr("attempt to yield across metamethod/C-call boundary")) {
             return lua_yield(L, 0);
         }
         luaL_error(L, Error);
@@ -106,240 +172,298 @@ int NewCCHandler(lua_State* L) {
     return lua_gettop(L);
 }
 
-int NewCClosure(lua_State* L) {
-    Closure* Cl = clvalue(index2addr(L, 1));
-    if (Cl->isC) {
-        lua_pushvalue(L, 1);
-        return 1;
-    }
-    int Ref = lua_ref(L, 1);
-    lua_pushcclosure(L, NewCCHandler, "", 0);
-    Closure* Cl2 = clvalue(index2addr(L, -1));
-    ClMap[Cl2] = Ref;
-    return 1;
+
+
+#define lua_preparepush(L,n)                lua_rawcheckstack((L),(n))
+#define lua_preparepushcollectable(L,n)  \
+        { lua_preparepush(L,n); luaC_threadbarrier(L); }
+
+
+static std::vector<Closure*>               g_wrappers;         
+static std::map<void*, lua_CFunction>      g_cfuncMap;         
+static std::map<void*, void*>              g_wrapper2Real;     
+
+
+static int trampoline(lua_State* L)
+{
+    void* key = (void*)clvalue(index2addr(L, lua_upvalueindex(1)));
+    auto it = g_cfuncMap.find(key);
+    if (it != g_cfuncMap.end())
+        return it->second(L);
+    return 0;
 }
 
-std::unordered_map<Closure*, __int64> CClosures;
+
+static void push_newcc(lua_State* L,
+    lua_CFunction cfn,
+    int nups /*=0*/)
+{
+    
+    lua_preparepushcollectable(L, 1);
+
+    
+    lua_pushlightuserdata(L, nullptr);           
+    lua_pushcclosurek(L, trampoline, nullptr,   
+        1 + nups, nullptr);
+
+
+    Closure* wrapper = clvalue(index2addr(L, -1));
+    g_cfuncMap[(void*)wrapper] = cfn;
+}
+
+
+static int newcclosure_handler(lua_State* L)
+{
+    void* key = (void*)clvalue(L->ci->func);
+    auto  it = g_wrapper2Real.find(key);
+    if (it == g_wrapper2Real.end() || it->second == nullptr)
+        return 0;                                   
+
+    TValue* top = L->top;
+    top->value.p = it->second;                      
+    top->tt = LUA_TFUNCTION;
+    L->top = top + 1;
+
+    lua_insert(L, 1);                               
+
+    int nargs = lua_gettop(L);
+    int res = lua_pcall(L, nargs, LUA_MULTRET, 0);
+    if (res == LUA_OK && (L->status == LUA_YIELD || L->status == LUA_BREAK))
+        return -1;
+
+    return lua_gettop(L);                           
+}
+
+
+static int newcclosure_cont(lua_State* L, int status)
+{
+    if (status == LUA_OK) return lua_gettop(L);
+    luaL_error(L, lua_tostring(L, -1));
+    return 0;
+}
+
+
+int newcclosure(lua_State* L)
+{
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+    if (lua_iscfunction(L, 1))
+        (void)luaL_error(L, "L closure expected");
+    return 0;
+
+    TValue* tv = (TValue*)index2addr(L, 1);
+    void* realClosurePtr = (void*)&tv->value.gc->cl;
+
+    /* store the real Lua closure somewhere stable */
+    lua_ref(L, 1);                                  /* pops from stack */
+
+    /* create our wrapper on top */
+    push_newcc(L, newcclosure_handler, 0);
+
+    /* record mapping: wrapper → realPtr */
+    Closure* wrapper = clvalue(index2addr(L, -1));
+    g_wrappers.push_back(wrapper);
+    g_wrapper2Real[(void*)wrapper] = realClosurePtr;
+
+    /* set wrapper ptr as trampoline upvalue (#1) so we can find ourselves */
+    lua_pushvalue(L, -1);                /* wrapper closure */
+    lua_setupvalue(L, -2, 1);            /* set upvalue[1] = wrapper */
+
+    return 1;                            /* wrapper left on stack */
+}
+
 
 int NewCClosureStub(lua_State* L)
 {
-    const auto Nargs = lua_gettop(L);
-    int LClosure = CClosures.find(clvalue(L->ci->func))->second;
-    if (!LClosure)
+    const int nargs = lua_gettop(L);
+
+    Closure* closure = clvalue(L->ci->func);
+    auto it = CClosures.find(closure);
+    if (it == CClosures.end())
         return 0;
 
-    lua_getref(L, LClosure);
+    int lclosureRef = it->second;
+    lua_getref(L, lclosureRef);
     lua_insert(L, 1);
 
-    const char* Error;
-    const auto Res = lua_pcall(L, Nargs, LUA_MULTRET, 0);
-
-    if (Res && Res != LUA_YIELD && (Error = lua_tostring(L, -1), !strcmp(Error, xorstr_("attempt to yield across metamethod/C-call boundary"))))
+    const int status = lua_pcall(L, nargs, LUA_MULTRET, 0);
+    if (status == LUA_YIELD)
         return lua_yield(L, 0);
 
-    if (Res != LUA_OK)
+    if (status != LUA_OK)
     {
-        luaL_error(L, "%s", lua_tostring(L, -1));
+        const char* err = lua_tostring(L, -1);
+        if (err && strcmp(err, ObfStr("attempt to yield across metamethod/C-call boundary")) == 0)
+            return lua_yield(L, 0);
         return 0;
     }
+
     return lua_gettop(L);
 }
 
+namespace Metatable {
 
-int HookFunction(lua_State* L)
-{
-    luaL_stackcheck(L, 2, 2, luaL_checktype(L, 1, LUA_TFUNCTION););
-    luaL_checktype(L, 2, LUA_TFUNCTION);
+#define lua_preparepush(L, pushCount) lua_rawcheckstack(L, pushCount)
+#define lua_preparepushcollectable(L, pushCount) { lua_preparepush(L, pushCount); luaC_threadbarrier(L); }
 
-    auto Function = lua_toclosure(L, 1);
-    auto Hook = lua_toclosure(L, 2);
 
-    if (Function->isC)
+    [[noreturn]] int luaL_errorLd(lua_State* L, const char* fmt, ...)
     {
-        const auto HookRef = lua_ref(L, 2);
-
-        if (!Hook->isC)
-        {
-            lua_pushcclosure(L, NewCClosureStub, 0, 0);
-            CClosures[&luaA_toobject(L, -1)->value.gc->cl] = HookRef;
-            Hook = lua_toclosure(L, -1);
-            lua_ref(L, -1);
-            lua_pop(L, 1);
-        }
-
-        lua_CFunction Func1 = Hook->c.f;
-        lua_clonefunction(L, 1);
-        Function->c.f = [](lua_State* L) -> int { return 0; };
-
-        for (auto i = 0; i < Hook->nupvalues; i++)
-        {
-            auto OldTValue = &Function->c.upvals[i];
-            auto HookTValue = &Hook->c.upvals[i];
-
-            OldTValue->value = HookTValue->value;
-            OldTValue->tt = HookTValue->tt;
-        }
-
-        auto ClosureRef = CClosures.find(Function)->second;
-        if (ClosureRef != 0)
-        {
-            CClosures[Function] = HookRef;
-            CClosures[clvalue(luaA_toobject(L, -1))] = ClosureRef;
-        }
-
-        Function->nupvalues = Hook->nupvalues;
-        Function->c.f = Func1;
-
-        return 1;
+        va_list args;
+        va_start(args, fmt);
+        luaL_where(L, 1);
+        lua_pushvfstring(L, fmt, args);
+        va_end(args);
+        lua_concat(L, 2);
+        lua_error(L); // never returns
     }
-    else
+
+
+    int HookFunction(lua_State* L)
     {
-        if (Hook->isC)
+        luaL_stackcheck(L, 2, 2, luaL_checktype(L, 1, LUA_TFUNCTION););
+        luaL_checktype(L, 2, LUA_TFUNCTION);
+
+        auto Function = lua_toclosure(L, 1);
+        auto Hook = lua_toclosure(L, 2);
+
+        if (Function->isC)
         {
-            lua_newtable(L);
-            lua_newtable(L);
+            const auto HookRef = lua_ref(L, 2);
 
-            lua_pushvalue(L, LUA_GLOBALSINDEX);
-            lua_setfield(L, -2, xorstr_("__index"));
-            lua_setreadonly(L, -1, true);
+            if (!Hook->isC)
+            {
+                lua_pushcclosure(L, NewCClosureStub, 0, 0);
+                CClosures[&luaA_toobject(L, -1)->value.gc->cl] = HookRef;
+                Hook = lua_toclosure(L, -1);
+                lua_ref(L, -1);
+                lua_pop(L, 1);
+            }
 
-            lua_setmetatable(L, -2);
+            lua_CFunction Func1 = Hook->c.f;
+            lua_clonefunction(L, 1);
+            Function->c.f = [](lua_State* L) -> int { return 0; };
 
-            lua_pushvalue(L, 2);
-            lua_setfield(L, -2, xorstr_("cFuncCall"));
+            for (auto i = 0; i < Hook->nupvalues; i++)
+            {
+                auto OldTValue = &Function->c.upvals[i];
+                auto HookTValue = &Hook->c.upvals[i];
 
-            static auto Encoder = CBytecodeEncoder();
-            const auto Bytecode = Luau::compile(xorstr_("return cFuncCall(...)"), {}, {}, &Encoder);
-            luau_load(L, "", Bytecode.c_str(), Bytecode.size(), -1);
-            Hook = lua_toclosure(L, -1);
-        }
+                OldTValue->value = HookTValue->value;
+                OldTValue->tt = HookTValue->tt;
+            }
 
-        Proto* nProto = Hook->l.p;
-        lua_clonefunction(L, 1);
+            auto ClosureRef = CClosures.find(Function)->second;
+            if (ClosureRef != 0)
+            {
+                CClosures[Function] = HookRef;
+                CClosures[clvalue(luaA_toobject(L, -1))] = ClosureRef;
+            }
 
-        Function->env = Hook->env;
+            Function->nupvalues = Hook->nupvalues;
+            Function->c.f = Func1;
 
-        Function->stacksize = Hook->stacksize;
-        Function->preload = Hook->preload;
-
-        for (auto i = 0; i < Hook->nupvalues; ++i)
-            setobj2n(L, &Function->l.uprefs[i], &Hook->l.uprefs[i]);
-
-        Function->nupvalues = Hook->nupvalues;
-        Function->l.p = nProto;
-
-        return 1;
-    }
-    return 0;
-}
-
-int HookMetaMethod(lua_State* L)
-{
-    // Argument check: (object, metamethodName, hookFunction)
-    luaL_checkany(L, 1); // Accept Instance/userdata/table
-    luaL_checktype(L, 2, LUA_TSTRING); // "__index", "__namecall", etc.
-    luaL_checktype(L, 3, LUA_TFUNCTION); // Function to hook
-
-    const char* methodName = lua_tostring(L, 2);
-
-    // Get or create metatable of the object
-    if (!lua_getmetatable(L, 1)) {
-        // If no metatable, create one
-        lua_newtable(L);
-        lua_setmetatable(L, 1);
-        lua_getmetatable(L, 1); // Push it again
-    }
-
-    int metaIndex = lua_gettop(L);
-
-    // Confirm the metatable is a table
-    if (!lua_istable(L, metaIndex)) {
-        luaL_error(L, "Failed to get a valid metatable.");
-        return 0;
-    }
-
-    // Save original function (optional: store in registry or upvalue for restoration)
-    lua_pushstring(L, methodName);   // Key
-    lua_rawget(L, metaIndex);        // meta[methodName]
-    int originalFuncType = lua_type(L, -1);
-
-    if (originalFuncType != LUA_TFUNCTION && originalFuncType != LUA_TNIL) {
-        lua_pop(L, 1); // Not a valid hookable function
-        luaL_error(L, "Cannot hook metamethod: original is not a function.");
-        return 0;
-    }
-
-    lua_pop(L, 1); // Pop original method
-
-    // Set new hook function
-    lua_pushstring(L, methodName);
-    lua_pushvalue(L, 3); // The hook function
-    lua_rawset(L, metaIndex); // metatable[methodName] = hook
-
-    lua_pop(L, 1); // Pop metatable
-
-    lua_pushboolean(L, 1); // Return true to Lua
-    return 1;
-}
-
-int debug_setstack(lua_State* L) {
-    luaL_checktype(L, 1, LUA_TNUMBER);
-    luaL_checktype(L, 2, LUA_TNUMBER);
-    luaL_checkany(L, 3);
-
-    int originalArgsCount = lua_gettop(L);
-
-    lua_getglobal(L, ObfStr("getfenv"));
-    lua_call(L, 0, 1);
-
-    lua_getglobal(L, "debug");
-    lua_setfield(L, -2, "debug");
-
-    lua_pop(L, lua_gettop(L) - originalArgsCount);
-
-    std::int32_t indice = lua_tonumber(L, 1);
-    std::int32_t idx = lua_tonumber(L, 2);
-    auto value = index2addr(L, 3);
-
-    luaL_argcheck(L, indice > 0, 1, ObfStr("invalid level passed to setstack"));
-
-    std::int32_t level = indice;
-    CallInfo* ci = nullptr;
-    Closure* f = nullptr;
-
-    if (unsigned(level) < unsigned(L->ci - L->base_ci)) {
-        ci = L->ci - level;
-        const auto args = cast_int(ci->top - ci->base);
-
-        if (args > (idx - 1)) {
-            auto reg = ci->base + (idx - 1);
-            luaA_pushobject(L, value);
-
-            const auto val = index2addr(L, -1);
-            if (val->tt != reg->tt)
-                luaL_argerror(L, 3, ObfStr("type does not match register at specified index"));
-
-            setobj(L, reg, val);
+            return 1;
         }
         else
-            luaL_error(L, ObfStr("invalid index passed to setstack"));
-    }
-    else
-        luaL_error(L, ObfStr("invalid level passed to setstack"));
+        {
+            if (Hook->isC)
+            {
+                lua_newtable(L);
+                lua_newtable(L);
 
-    return 0;
-};
+                lua_pushvalue(L, LUA_GLOBALSINDEX);
+                lua_setfield(L, -2, xorstr_("__index"));
+                lua_setreadonly(L, -1, true);
+
+                lua_setmetatable(L, -2);
+
+                lua_pushvalue(L, 2);
+                lua_setfield(L, -2, xorstr_("cFuncCall"));
+
+                static auto Encoder = CBytecodeEncoder();
+                const auto Bytecode = Luau::compile(xorstr_("return cFuncCall(...)"), {}, {}, &Encoder);
+                luau_load(L, "", Bytecode.c_str(), Bytecode.size(), -1);
+                Hook = lua_toclosure(L, -1);
+            }
+
+            Proto* nProto = Hook->l.p;
+            lua_clonefunction(L, 1);
+
+            Function->env = Hook->env;
+
+            Function->stacksize = Hook->stacksize;
+            Function->preload = Hook->preload;
+
+            for (auto i = 0; i < Hook->nupvalues; ++i)
+                setobj2n(L, &Function->l.uprefs[i], &Hook->l.uprefs[i]);
+
+            Function->nupvalues = Hook->nupvalues;
+            Function->l.p = nProto;
+
+            return 1;
+        }
+        return 0;
+    }
+    int hookmetamethod(lua_State* state) {
+        if (!lua_isuserdata(state, 1) && !lua_istable(state, 1)) {
+            luaL_error(state, "Expected userdata or table as first argument.");
+            return 0;
+        }
+
+        const char* metamethod = luaL_checkstring(state, 2);
+
+        if (!lua_getmetatable(state, 1)) {
+            luaL_error(state, "No metatable detected!");
+            return 0;
+        }
+
+        lua_pushstring(state, metamethod);
+        lua_rawget(state, -2);
+
+        if (lua_isnil(state, -1)) {
+            lua_pop(state, 1);
+            luaL_error(state, "Invalid meta method");
+            return 0;
+        }
+
+        if (!lua_isfunction(state, 3)) {
+            luaL_error(state, "Need function at 3rd argument!");
+            return 0;
+        }
+
+        lua_getglobal(state, "hookfunction");
+        if (!lua_isfunction(state, -1)) {
+            luaL_error(state, "hookfunction is not available in global environment.");
+            return 0;
+        }
+
+        lua_pushvalue(state, -2);
+        lua_pushvalue(state, 3);
+
+        if (lua_pcall(state, 2, 1, 0) != LUA_OK) {
+            luaL_error(state, "%s", lua_tostring(state, -1));
+            return 0;
+        }
+
+        return 1;
+    }
+
+
+
+}
+
 
 
 void api::Environment::Cl::Register(lua_State* L) {
-    RegisterFunction(L, debug_setstack, oxorany("debug_setstack"));
+    RegisterFunction(L, loadstring, oxorany("loadstring")); // rewrite needed
+    RegisterFunction(L, loadstring, oxorany("load")); // rewrite needed
+    RegisterFunction(L, Metatable::HookFunction, oxorany("hookfunction"));
+    RegisterFunction(L, Metatable::HookFunction, oxorany("replaceclosure"));
+    RegisterFunction(L, Metatable::HookFunction, oxorany("hookfunc"));
+    // in test
     RegisterFunction(L, IsCClosure, oxorany("iscclosure"));
     RegisterFunction(L, IsLClosure, oxorany("islclosure"));
     RegisterFunction(L, CloneFunction, oxorany("clonefunction"));
-    RegisterFunction(L, Loadstring, oxorany("loadstring"));
-    RegisterFunction(L, NewCClosure, oxorany("newcclosure"));
+    RegisterFunction(L, newcclosure, oxorany("newcclosure"));
     RegisterFunction(L, CheckCaller, oxorany("checkcaller"));
-    RegisterFunction(L, HookFunction, oxorany("hookfunction"));
-    RegisterFunction(L, HookFunction, oxorany("replaceclosure"));
-    RegisterFunction(L, HookMetaMethod, oxorany("hookmetamethod"));
 }
