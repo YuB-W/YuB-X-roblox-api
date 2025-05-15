@@ -1,4 +1,4 @@
-/* Updated for version-ff05edc617954c5b */
+/* Updated for version-3c1b78b767674c66 */
 
 #pragma once
 
@@ -42,26 +42,26 @@ struct SignalT {
 
 namespace Update {
     //
-    const uintptr_t Print =                     REBASE(0x16C1A30); // Current identity is %d updated
+    const uintptr_t Print =                     REBASE(0x16D2D00); // Current identity is %d updated
 
     // functions
-    const uintptr_t PushInstance =              REBASE(0x1001240);
-    const uintptr_t PushInstance2 =             REBASE(0x1001290); //0xFD8160
-    const uintptr_t FireClickDetector =         REBASE(0x1DC0D30);
+    const uintptr_t PushInstance =              REBASE(0x101AD00);//Updated
+    const uintptr_t PushInstance2 =             REBASE(0x101AD50); //0xFD8160 //Updated
+    const uintptr_t FireClickDetector =         REBASE(0x1DED7B0); //Updated
 
     //core 
-    const uintptr_t RawScheduler =              REBASE(0x69CD068); // ClusterPacketCacheTaskQueue
-    const uintptr_t GetGlobalStateForInstance = REBASE(0xF2A5F0);  // Script Start 0xF08A50
-    const uintptr_t DecryptState =              REBASE(0xCBDE70); // Script Start
-    const uintptr_t LuaVM__Load =               REBASE(0xCC0A60); // oldResult, moduleRef = ...
-    const uintptr_t Task__Defer =               REBASE(0x115C9C0); // Maximum re-entrancy depth (%i) 
+    const uintptr_t RawScheduler =              REBASE(0x69EA688); // ClusterPacketCacheTaskQueue Updated
+    const uintptr_t GetGlobalStateForInstance = REBASE(0xF40490);  // Script Start 0xF08A50 //Update
+    const uintptr_t DecryptState =              REBASE(0xCCA300); // Script Start //Updated
+    const uintptr_t LuaVM__Load =               REBASE(0xCCCFB0); // oldResult, moduleRef = ... Updated
+    const uintptr_t Task__Defer =               REBASE(0x1172FB0); // Maximum re-entrancy depth (%i) Updated
 
 
     // updated
 
     namespace Bytecode
     {
-        const uintptr_t RequestCode = REBASE(0xA82310);
+        const uintptr_t RequestCode = REBASE(0xA811A0);//Updated
         const uintptr_t Bytecode = 0x10;
         const uintptr_t BytecodeSize = 0x20;
 
@@ -84,18 +84,18 @@ namespace Update {
     }
 
     namespace InternalFastFlags {
-    const uintptr_t DebugCheckRenderThreading                 = REBASE(0x6122318);  // ✅
-    const uintptr_t RenderDebugCheckThreading2                = REBASE(0x61521C8);  // ✅
-    const uintptr_t EnableLoadModule                          = REBASE(0x60EBDA0);  // ✅
-    const uintptr_t DisableCorescriptLoadstring               = REBASE(0x60EBD80);  // ✅
-    const uintptr_t CrashOnDataModelValidationFailure         = REBASE(0x610A940);  // ✅
-    const uintptr_t RuntimeCrashOnHang                        = REBASE(0x613EBA0);  // ✅
-    const uintptr_t LockViolationScriptCrash                  = REBASE(0x60EB9F0);  // ✅
-    const uintptr_t CapsMissUnassignedTelemetry               = REBASE(0x6139A20);  // ✅
-    const uintptr_t LockViolationInstanceCrash                = REBASE(0x60FBEF8);  // ✅
-    const uintptr_t NewScriptContextStrictFacetAccessChecks   = REBASE(0x60EB000);  // ✅
+    const uintptr_t DebugCheckRenderThreading                 = REBASE(0x615DCC8);  // ✅
+    const uintptr_t RenderDebugCheckThreading2                = REBASE(0x618DDD8);  // ✅
+    const uintptr_t EnableLoadModule                          = REBASE(0x6127080);  // ✅
+    const uintptr_t DisableCorescriptLoadstring               = REBASE(0x6127060);  // ✅
+    const uintptr_t CrashOnDataModelValidationFailure         = REBASE(0x6145EA0);  // ✅
+    const uintptr_t RuntimeCrashOnHang                        = REBASE(0x617A890);  // ✅
+    const uintptr_t LockViolationScriptCrash                  = REBASE(0x6126CD0);  // ✅
+    const uintptr_t CapsMissUnassignedTelemetry               = REBASE(0x6175660);  // ✅
+    const uintptr_t LockViolationInstanceCrash                = REBASE(0x61372C8);  // ✅
+    const uintptr_t NewScriptContextStrictFacetAccessChecks   = REBASE(0x61262D0);  // ✅
 
-    const uintptr_t LuaStepIntervalMsOverrideEnabled = REBASE(0x60EF7D0);  // ✅
+    const uintptr_t LuaStepIntervalMsOverrideEnabled = REBASE(0x612ABB0);  // ✅
 
 }
 
@@ -122,13 +122,13 @@ namespace Update {
     }
 
     namespace DataModel {
-        const uintptr_t FakeDataModelPointer = REBASE(0x690D168);
+        const uintptr_t FakeDataModelPointer = REBASE(0x692B798);
         const uintptr_t FakeDataModelToDataModel = 0x1B8;
         const uintptr_t PlaceId = 0x1A0;
         const uintptr_t ScriptContext = 0x3B0;
 
         namespace Information {
-            const uintptr_t PushInstance = REBASE(0x1001240); // sub_FC65C0 0xFD8110
+            const uintptr_t PushInstance = REBASE(0x101AD00); // sub_FC65C0 0xFD8110 //Updated
             const uintptr_t Children = 0x80;
             const uintptr_t ChildrenEnd = 0x8;
             const uintptr_t Parent = 0x50;
