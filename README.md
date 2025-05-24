@@ -1,5 +1,5 @@
 # 🚀 YuB-X Roblox API  
-**Version:** `version-3c1b78b767674c66`  
+**Version:** `version-e00a4ca39fb04359`  
 **UNC – 50+**
 
 ---
