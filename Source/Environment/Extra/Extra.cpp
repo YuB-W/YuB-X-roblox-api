@@ -153,7 +153,7 @@ int custom_is_in_roblox_window(lua_State* L) {
 int custom_getinstancelist(lua_State* L) {
 
 	lua_pushvalue(L, LUA_REGISTRYINDEX);
-	lua_pushlightuserdata(L, (void*)Update::DataModel::Information::PushInstance);
+	lua_pushlightuserdata(L, (void*)Update::PushInstance);
 	lua_gettable(L, -2);
 	return 1;
 };

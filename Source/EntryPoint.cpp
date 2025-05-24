@@ -24,7 +24,7 @@ std::atomic<bool> teleportMonitoringActive{ true };
 
 uintptr_t GlobalState() {
     auto ScriptContext = RBX::Scheduler->GetScriptContext();
-    uintptr_t GlobalState = ScriptContext + Update::ScriptContext::GlobalState;
+    uintptr_t GlobalState = ScriptContext + Update::GlobalState;
     return GlobalState;
 }
 
@@ -156,9 +156,9 @@ void monitor_teleport() {
                 uintptr_t StateIndex[] = { 0 };
                 uintptr_t ActorIndex[] = { 0, 0 };
 
-                lua_State* L = RBX::DecryptState(
-                    RBX::GetGlobalStateForInstance(GlobalState(), StateIndex, ActorIndex) +
-                    Update::ScriptContext::DecryptState
+                lua_State* L = RBX::DecryptLuaState(
+                    RBX::GetGlobalState(GlobalState(), StateIndex, ActorIndex) +
+                    Update::EncryptedState
                 );
 
                 lua_State* ExploitThread = Execution->NewThread(L);
@@ -195,9 +195,9 @@ void InitializeExploitation() {
         uintptr_t StateIndex[] = { 0 };
         uintptr_t ActorIndex[] = { 0, 0 };
 
-        lua_State* L = RBX::DecryptState(
-            RBX::GetGlobalStateForInstance(GlobalState(), StateIndex, ActorIndex) +
-            Update::ScriptContext::DecryptState
+        lua_State* L = RBX::DecryptLuaState(
+            RBX::GetGlobalState(GlobalState(), StateIndex, ActorIndex) +
+            Update::EncryptedState
         );
 
         lua_State* ExploitThread = Execution->NewThread(L);

@@ -36,9 +36,9 @@ l_noret luaL_argerrorL(lua_State* L, int narg, const char* extramsg)
     const char* fname = currfuncname(L);
 
     if (fname)
-        luaL_error(L, ObfStr("invalid argument #%d to '%s' (%s)"), narg, fname, extramsg);
+        luaL_error(L, "invalid argument #%d to '%s' (%s)", narg, fname, extramsg);
     else
-        luaL_error(L, ObfStr("invalid argument #%d (%s)"), narg, extramsg);
+        luaL_error(L, "invalid argument #%d (%s)", narg, extramsg);
 }
 
 l_noret luaL_typeerrorL(lua_State* L, int narg, const char* tname)

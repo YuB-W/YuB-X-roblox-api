@@ -85,7 +85,7 @@ Closure* luaF_newLclosure(lua_State* L, int nelems, Table* e, Proto* p)
     ClosureMap.insert(std::pair<Closure*, bool>{ c, true });
     return c;
 }
-inline uintptr_t bitmap = *(uintptr_t*)Offsets::BitMap;
+inline uintptr_t bitmap = *(uintptr_t*)Update::BitMap;
 
 #define PatchCFG(page) (*reinterpret_cast<uint8_t*>((bitmap) + ((page) >> 0x13)) |= (1 << (((page) >> 16) & 7)))
 

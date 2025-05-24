@@ -30,8 +30,8 @@ int GetGenv(lua_State* L)
 
 int GetRenv(lua_State* L)
 {
-    lua_pushvalue(reinterpret_cast<lua_State*>(RBX::DecryptState(reinterpret_cast<uintptr_t>(L))), LUA_GLOBALSINDEX);
-    lua_xmove(reinterpret_cast<lua_State*>(RBX::DecryptState(reinterpret_cast<uintptr_t>(L))), L, 1);
+    lua_pushvalue(reinterpret_cast<lua_State*>(RBX::DecryptLuaState(reinterpret_cast<uintptr_t>(L))), LUA_GLOBALSINDEX);
+    lua_xmove(reinterpret_cast<lua_State*>(RBX::DecryptLuaState(reinterpret_cast<uintptr_t>(L))), L, 1);
     return 1;
 }
 

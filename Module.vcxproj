@@ -156,6 +156,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\;E:\CldyCin\Cldy\Module\Module\Dependencies;E:\CldyCin\Cldy\Module\Module\Dependencies\Base64;$(ProjectDir)Source\RBX\;$(ProjectDir)Source\Miscellaneous;$(IncludePath)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

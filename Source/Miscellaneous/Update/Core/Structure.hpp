@@ -113,10 +113,10 @@ public:
 };
 
 template <typename T>
-struct unwrap_vmvalue
+struct unwrap_vmval
 {
     using type = T;
 };
 
 template <typename T>
-using vmval0 = typename unwrap_vmvalue<T>::type;
+using vmval0 = typename unwrap_vmval<T>::type;

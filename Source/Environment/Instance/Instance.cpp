@@ -14,7 +14,7 @@ lua_setfield(L, -2, Name);
 
 int GetInstances(lua_State* L)
 {
-	lua_pushlightuserdata(L, reinterpret_cast<void*>(Update::DataModel::Information::PushInstance)); // Roblox uses the pushinstance address for the globals list
+	lua_pushlightuserdata(L, reinterpret_cast<void*>(Update::PushInstance)); // Roblox uses the pushinstance address for the globals list
 
 	lua_rawget(L, LUA_REGISTRYINDEX);
 

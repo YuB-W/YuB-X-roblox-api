@@ -75,7 +75,7 @@ uintptr_t CScheduler::GetScriptContext() {
 
 
 uintptr_t CScheduler::GetDataModel() {
-    uintptr_t fakeDM = *(uintptr_t*)Update::DataModel::FakeDataModelPointer;
+    uintptr_t fakeDM = *(uintptr_t*)Update::DataModel::FakeDataModel;
     return *(uintptr_t*)(fakeDM + Update::DataModel::FakeDataModelToDataModel);
 }
 
@@ -115,15 +115,15 @@ void CScheduler::BlacklistBadJobs() {
     }
 
     for (auto Job : jobs) {
-        uintptr_t global = GetScriptContext() + Update::ScriptContext::GlobalState;
+        uintptr_t global = GetScriptContext() + Update::GlobalState;
 
         uintptr_t StateIndex[1] = { 0 };
         uintptr_t ActorIndex[2] = { 0, 0 };
 
-        uintptr_t state = GetGlobalStateForInstance(global, StateIndex, ActorIndex);
-        uintptr_t decryptPtr = state + Update::ScriptContext::DecryptState;
+        uintptr_t state = RBX::GetGlobalState(global, StateIndex, ActorIndex);
+        uintptr_t decryptPtr = state + Update::EncryptedState;
 
-        lua_State* L = DecryptState(decryptPtr);
+        lua_State* L = RBX::DecryptLuaState(decryptPtr);
 
         if (!L || L->tt != LUA_TTHREAD) continue;
         lua_State* ExploitThread = Execution->NewThread(L);

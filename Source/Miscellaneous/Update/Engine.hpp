@@ -43,65 +43,42 @@ struct SignalT {
 namespace Update {
 
     // dumped
-    const uintptr_t LuaO_NilObject = REBASE(0x47F04F8); // updated
-    const uintptr_t LuaH_DummyNode = REBASE(0x47EFC28); // updated
-    const uintptr_t Luau_Execute = REBASE(0x282C8D0);	// updated
+    const uintptr_t LuaO_NilObject = REBASE(0x45099D8);
+    const uintptr_t LuaH_DummyNode = REBASE(0x4509108);
+    const uintptr_t Luau_Execute = REBASE(0x25E3B50);
 
-    const uintptr_t Print = REBASE(0x16D2D00);	// updated
-    const uintptr_t GetProperty = REBASE(0xBD6BB0);		// updated
-    const uintptr_t GetGlobalState = REBASE(0xF40490);		// updated
-    const uintptr_t DecryptLuaState = REBASE(0xCCA300);		// updated
-    const uintptr_t PushInstance = REBASE(0x101AD00);	// updated
-    const uintptr_t LuaVM__Load = REBASE(0xCCCFB0);		// updated
-    const uintptr_t Task__Defer = REBASE(0x1172FB0);	// updated
+    const uintptr_t Print = REBASE(0x14C8360);
+    const uintptr_t GetProperty = REBASE(0x9E7780);
+    const uintptr_t GetGlobalState = REBASE(0xD2F660);
+    const uintptr_t DecryptLuaState = REBASE(0xAD0240);
+    const uintptr_t PushInstance = REBASE(0xE06B50);
+    const uintptr_t LuaVM__Load = REBASE(0xAD32E0);
+    const uintptr_t Task__Defer = REBASE(0xF5DB40);
 
-    const uintptr_t FireMouseClick = REBASE(0x1DED7B0);	// updated
-    const uintptr_t FireRightMouseClick = REBASE(0x1DED950);    // updated
-    const uintptr_t FireMouseHoverEnter = REBASE(0x1DEED50);	// updated
-    const uintptr_t FireMouseHoverLeave = REBASE(0x1DEEEF0);	// updated
-    const uintptr_t FireTouchInterest = REBASE(0x15BCDB0);    // updated
-    const uintptr_t FireProximityPrompt = REBASE(0x1EBD9A0);		// updated
+    const uintptr_t FireMouseClick = REBASE(0x1BC08B0);
+    const uintptr_t FireRightMouseClick = REBASE(0x1BC0A50);
+    const uintptr_t FireMouseHoverEnter = REBASE(0x1BC1E50);
+    const uintptr_t FireMouseHoverLeave = REBASE(0x1BC1FF0);
+    const uintptr_t FireTouchInterest = REBASE(0x13B0C30);
+    const uintptr_t FireProximityPrompt = REBASE(0x1C92D30);
 
-    const uintptr_t RequestCode = REBASE(0xA811A0);		// updated
-    const uintptr_t GetIdentityStruct = REBASE(0x38B5C70);	// updated
-    const uintptr_t GetValues = REBASE(0xD59EE0);		// updated
-    const uintptr_t IdentityPtr = REBASE(0x6568838);	// updated
-    const uintptr_t RaiseEventInvocation = REBASE(0x16743C0);	// not usend for now
-    const uintptr_t LuaD_throw = REBASE(0x27FA100);	// updated
-    const uintptr_t RawScheduler = REBASE(0x69EA688);	// updated
-    const uintptr_t KTable = REBASE(0x650A350);	// updated
-    const uintptr_t BitMap = (uintptr_t)GetModuleHandle("RobloxPlayerBeta.dll") + 0x29AA80; // updated
+    const uintptr_t RequestCode = REBASE(0x897290);
+    const uintptr_t GetIdentityStruct = REBASE(0x3674BD0);
+    const uintptr_t IdentityPtr = REBASE(0x613BB48);
+    const uintptr_t LuaD_throw = REBASE(0x25B0DE0);
+    const uintptr_t RawScheduler = REBASE(0x65DDF18);
+    const uintptr_t KTable = REBASE(0x61081A0);
+    const uintptr_t BitMap = (uintptr_t)GetModuleHandle("RobloxPlayerBeta.dll") + 0x2750F8;
 
-    const uintptr_t GlobalState = 0x140;   // updated
-    const uintptr_t EncryptedState = 0x88; // updated
-    // dumped
-
-    namespace InternalFastFlags {
-
-        // dumped
-        const uintptr_t EnableLoadModule = REBASE(0x6127080);
-        const uintptr_t DebugCheckRenderThreading = REBASE(0x615DCC8);
-        const uintptr_t RenderDebugCheckThreading2 = REBASE(0x618DDD8);
-        const uintptr_t DisableCorescriptLoadstring = REBASE(0x6127060);
-        const uintptr_t RuntimeCrashOnHang = REBASE(0x617A890);
-        const uintptr_t CapsMissUnassignedTelemetry = REBASE(0x6175660);
-        const uintptr_t LuaStepIntervalMsOverrideEnabled = REBASE(0x612AB90);
-        //not						          
-        const uintptr_t CrashOnDataModelValidationFailure = REBASE(0x6145EA0);
-        const uintptr_t LockViolationScriptCrash = REBASE(0x6126CD0);
-        const uintptr_t LockViolationInstanceCrash = REBASE(0x61372C8);
-        const uintptr_t NewScriptContextStrictFacetAccessChecks = REBASE(0x61262D0);
-        const uintptr_t FixPluginRunContextRunning = REBASE(0x612B510);
-        // 
-    }
-
+    const uintptr_t GlobalState = 0x140;
+    const uintptr_t EncryptedState = 0x88;
 
     namespace DataModel {
-        const uintptr_t FakeDataModel = REBASE(0x692B798);
+        const uintptr_t FakeDataModel = REBASE(0x651E3B8);
         const uintptr_t FakeDataModelToDataModel = 0x1B8;
         const uintptr_t PlaceId = 0x1A0;
         const uintptr_t ScriptContext = 0x3B0;
-    }// not dumped / updated
+    }
 
     namespace Instance {
         const uintptr_t ClassDescriptor = 0x18;
@@ -128,12 +105,15 @@ namespace Update {
 
     namespace TaskScheduler {
         const uintptr_t FpsCap = 0x1B0;
+        const uintptr_t JobsStart = 0x1D0;
+        const uintptr_t jobEnd = 0x1D8;
+        const uintptr_t JobName = 0x18;
     }
 }
 
 namespace RBX {
 
-    using TPrint = void(__fastcall*)(int, const char*);
+    using TPrint = void(__fastcall*)(int, const char*, ...);
     inline auto Print = (TPrint)Update::Print;
 
     using TLuaVM__Load = int(__fastcall*)(lua_State*, void*, const char*, int);
@@ -142,10 +122,10 @@ namespace RBX {
     using TTask__Defer = int(__fastcall*)(lua_State*);
     inline auto Task__Defer = (TTask__Defer)Update::Task__Defer;
 
-    using TGetGlobalState = uintptr_t(__fastcall*)(uintptr_t, int32_t*, uintptr_t*);
+    using TGetGlobalState = uintptr_t(__fastcall*)(uintptr_t, uintptr_t*, uintptr_t*);
     inline auto GetGlobalState = (TGetGlobalState)Update::GetGlobalState;
 
-    using TDecryptLuaState = uintptr_t(__fastcall*)(uintptr_t);
+    using TDecryptLuaState = lua_State * (__fastcall*)(uintptr_t);
     inline auto DecryptLuaState = (TDecryptLuaState)Update::DecryptLuaState;
 
     using TPushInstance = void(__fastcall*)(lua_State* state, void* instance);

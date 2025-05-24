@@ -19,7 +19,7 @@ int Invalidate(lua_State* L)
 
 	auto RawUd = *reinterpret_cast<uintptr_t**>(Ud);
 
-	lua_pushlightuserdata(L, reinterpret_cast<void*>(Update::DataModel::Information::PushInstance));
+	lua_pushlightuserdata(L, reinterpret_cast<void*>(Update::PushInstance));
 	lua_rawget(L, LUA_REGISTRYINDEX);
 
 	lua_pushlightuserdata(L, RawUd);
@@ -34,7 +34,7 @@ int cloneref(lua_State* L)
     auto Ud = lua_touserdata(L, 1);
     auto RawUd = *static_cast<void**>(Ud);
 
-    lua_pushlightuserdata(L, reinterpret_cast<void*>(Update::DataModel::Information::PushInstance)); // Roblox uses the pushinstance address for the globals list
+    lua_pushlightuserdata(L, reinterpret_cast<void*>(Update::PushInstance)); // Roblox uses the pushinstance address for the globals list
 
     lua_rawget(L, LUA_REGISTRYINDEX);
     lua_pushlightuserdata(L, RawUd); // Let's check if the value exists in the registry
@@ -44,7 +44,7 @@ int cloneref(lua_State* L)
     lua_pushnil(L); // If the value exists, we need to set the ref to nil
     lua_rawset(L, -4);
 
-    reinterpret_cast<void(__fastcall*)(lua_State*, void*)>(Update::DataModel::Information::PushInstance)(L, Ud);
+    reinterpret_cast<void(__fastcall*)(lua_State*, void*)>(Update::PushInstance)(L, Ud);
     // Now once we are done, we need to restore the instance
     lua_pushlightuserdata(L, RawUd);
     lua_pushvalue(L, -3);
