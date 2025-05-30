@@ -1,6 +1,6 @@
 # 🚀 YuB-X Roblox API  
 **Version:** `version-e00a4ca39fb04359`  
-**UNC – 50+**
+**UNC – 50+** | Not anymore -vuxqzo
 
 ---
 
