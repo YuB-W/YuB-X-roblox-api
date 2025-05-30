@@ -43,38 +43,38 @@ struct SignalT {
 namespace Update {
 
     // dumped
-    const uintptr_t LuaO_NilObject = REBASE(0x45099D8);
-    const uintptr_t LuaH_DummyNode = REBASE(0x4509108);
-    const uintptr_t Luau_Execute = REBASE(0x25E3B50);
+    const uintptr_t LuaH_DummyNode = REBASE(0x468D6C8);
+    const uintptr_t LuaO_NilObject = REBASE(0x468DCA8);
+    const uintptr_t Luau_Execute = REBASE(0x275D280);
 
-    const uintptr_t Print = REBASE(0x14C8360);
-    const uintptr_t GetProperty = REBASE(0x9E7780);
-    const uintptr_t GetGlobalState = REBASE(0xD2F660);
-    const uintptr_t DecryptLuaState = REBASE(0xAD0240);
-    const uintptr_t PushInstance = REBASE(0xE06B50);
-    const uintptr_t LuaVM__Load = REBASE(0xAD32E0);
-    const uintptr_t Task__Defer = REBASE(0xF5DB40);
+    const uintptr_t Print = REBASE(0x15469F0);
+    const uintptr_t GetProperty = REBASE(0xA3DDB0);
+    const uintptr_t GetGlobalState = REBASE(0xDA0660);
+    const uintptr_t DecryptLuaState = REBASE(0xB25660);
+    const uintptr_t PushInstance = REBASE(0xE7CBC0);
+    const uintptr_t LuaVM__Load = REBASE(0xB28790);
+    const uintptr_t Task__Defer = REBASE(0xFC9CA0); //nigga
 
-    const uintptr_t FireMouseClick = REBASE(0x1BC08B0);
-    const uintptr_t FireRightMouseClick = REBASE(0x1BC0A50);
-    const uintptr_t FireMouseHoverEnter = REBASE(0x1BC1E50);
-    const uintptr_t FireMouseHoverLeave = REBASE(0x1BC1FF0);
-    const uintptr_t FireTouchInterest = REBASE(0x13B0C30);
-    const uintptr_t FireProximityPrompt = REBASE(0x1C92D30);
+    const uintptr_t FireMouseClick = REBASE(0x1C4E4E0);
+    const uintptr_t FireRightMouseClick = REBASE(0x1C4E680);
+    const uintptr_t FireMouseHoverEnter = REBASE(0x1C4FA80);
+    const uintptr_t FireMouseHoverLeave = REBASE(0x1C4FC20);
+    const uintptr_t FireTouchInterest = REBASE(0x141B380);
+    const uintptr_t FireProximityPrompt = REBASE(0x1D236A0);
 
-    const uintptr_t RequestCode = REBASE(0x897290);
-    const uintptr_t GetIdentityStruct = REBASE(0x3674BD0);
-    const uintptr_t IdentityPtr = REBASE(0x613BB48);
-    const uintptr_t LuaD_throw = REBASE(0x25B0DE0);
-    const uintptr_t RawScheduler = REBASE(0x65DDF18);
-    const uintptr_t KTable = REBASE(0x61081A0);
-    const uintptr_t BitMap = (uintptr_t)GetModuleHandle("RobloxPlayerBeta.dll") + 0x2750F8;
+    const uintptr_t RequestCode = REBASE(0x8EBD60);
+    const uintptr_t GetIdentityStruct = REBASE(0x37F57D0);
+    const uintptr_t IdentityPtr = REBASE(0x6304418);
+    const uintptr_t LuaD_throw = REBASE(0x27226D0);
+    const uintptr_t RawScheduler = REBASE(0x67AB9E8);
+    const uintptr_t KTable = REBASE(0x62D04B0);
+    const uintptr_t BitMap = (uintptr_t)GetModuleHandle("RobloxPlayerBeta.dll") + 0x2855A8;
 
     const uintptr_t GlobalState = 0x140;
     const uintptr_t EncryptedState = 0x88;
 
     namespace DataModel {
-        const uintptr_t FakeDataModel = REBASE(0x651E3B8);
+        const uintptr_t FakeDataModel = REBASE(0x66EA5E8);
         const uintptr_t FakeDataModelToDataModel = 0x1B8;
         const uintptr_t PlaceId = 0x1A0;
         const uintptr_t ScriptContext = 0x3B0;
