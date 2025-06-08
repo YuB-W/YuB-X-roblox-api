@@ -6,7 +6,6 @@
 #include "ltm.h"
 
 #include "Update/LuaVM.hpp"
-
 // registry
 #define registry(L) (&L->global->registry)
 
@@ -20,7 +19,7 @@
 // clang-format off
 typedef struct stringtable
 {
-    LUAU_SHUFFLE3(LUAU_SEMICOLON_SEP,
+LUAU_SHUFFLE3(LUAU_SEMICOLON_SEP,
     TString** hash,
     uint32_t nuse, // number of elements
     int size);
@@ -203,7 +202,7 @@ typedef struct global_State
     LUAU_SHUFFLE5(LUAU_SEMICOLON_SEP,
     struct lua_State* mainthread,
     UpVal uvhead,                                    // head of double-linked list of all open upvalues
-    struct Table* mt[LUA_T_COUNT],                   // metatables for basic types
+    struct LuaTable* mt[LUA_T_COUNT],                   // metatables for basic types
     GSTATE_TTNAME_ENC<TString*> ttname[LUA_T_COUNT],       // names for basic types
     GSTATE_TMNAME_ENC<TString*> tmname[TM_N]);             // array with tag-method names
 
@@ -222,7 +221,7 @@ typedef struct global_State
     lua_ExecutionCallbacks ecb;
 
     void (*udatagc[LUA_UTAG_LIMIT])(lua_State*, void*); // for each userdata tag, a gc callback to be called immediately before freeing memory
-    Table* udatamt[LUA_LUTAG_LIMIT]; // metatables for tagged userdata
+    LuaTable* udatamt[LUA_LUTAG_LIMIT]; // metatables for tagged userdata
 
     TString* lightuserdataname[LUA_LUTAG_LIMIT]; // names for tagged lightuserdata
 
@@ -273,7 +272,7 @@ struct lua_State
 
 
     LUAU_SHUFFLE3(LUAU_SEMICOLON_SEP,
-    Table* gt,           // table of globals
+    LuaTable* gt,           // table of globals
     UpVal* openupval,    // list of open upvalues in this stack
     GCObject* gclist);
 
@@ -292,11 +291,11 @@ union GCObject
     struct TString ts;
     struct Udata u;
     struct Closure cl;
-    struct Table h;
+    struct LuaTable h;
     struct Proto p;
     struct UpVal uv;
     struct lua_State th; // thread
-    struct Buffer buf;
+    struct LuauBuffer buf;
 };
 
 // macros to convert a GCObject into a specific value

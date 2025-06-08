@@ -4,31 +4,6 @@
 
 #include "lua.h"
 
-struct lua_Page
-{
-    // list of pages with free blocks
-    lua_Page* prev;
-    lua_Page* next;
-
-    // list of all pages
-    lua_Page* listprev;
-    lua_Page* listnext;
-
-    int pageSize;  // page size in bytes, including page header
-    int blockSize; // block size in bytes, including block header (for non-GCO)
-
-    void* freeList; // next free block in this page; linked with metadata()/freegcolink()
-    int freeNext;   // next free block offset in this page, in bytes; when negative, freeList is used instead
-    int busyBlocks; // number of blocks allocated out of this page
-
-    union
-    {
-        char data[1];
-        double align1;
-        void* align2;
-    };
-};
-
 struct lua_Page;
 union GCObject;
 

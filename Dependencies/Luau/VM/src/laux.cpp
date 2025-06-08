@@ -8,8 +8,10 @@
 #include "lapi.h"
 #include "lgc.h"
 #include "lnumutils.h"
-#include <Environment/Library.hpp>
+
 #include <string.h>
+
+LUAU_FASTFLAG(LuauYieldableContinuations)
 
 // convert a stack index to positive
 #define abs_index(L, i) ((i) > 0 || (i) <= LUA_REGISTRYINDEX ? (i) : lua_gettop(L) + (i) + 1)
@@ -20,7 +22,7 @@
 ** =======================================================
 */
 
-const char* currfuncname(lua_State* L)
+static const char* currfuncname(lua_State* L)
 {
     Closure* cl = L->ci > L->base_ci ? curr_func(L) : NULL;
     const char* debugname = cl && cl->isC ? cl->c.debugname + 0 : NULL;
@@ -67,6 +69,7 @@ static l_noret tag_error(lua_State* L, int narg, int tag)
     luaL_typeerrorL(L, narg, lua_typename(L, tag));
 }
 
+// Can be called without stack space reservation
 void luaL_where(lua_State* L, int level)
 {
     lua_Debug ar;
@@ -75,9 +78,12 @@ void luaL_where(lua_State* L, int level)
         lua_pushfstring(L, "%s:%d: ", ar.short_src, ar.currentline);
         return;
     }
+
+    lua_rawcheckstack(L, 1);
     lua_pushliteral(L, ""); // else, no information available...
 }
 
+// Can be called without stack space reservation
 l_noret luaL_errorL(lua_State* L, const char* fmt, ...)
 {
     va_list argp;
@@ -150,13 +156,6 @@ void luaL_checktype(lua_State* L, int narg, int t)
 {
     if (lua_type(L, narg) != t)
         tag_error(L, narg, t);
-}
-
-void luaL_checktypes(lua_State* L, int narg, int t1, int t2)
-{
-    int type = lua_type(L, narg);
-    if (type != t1 && type != t2)
-        luaL_typeerror(L, 1, "unexpected arg type");
 }
 
 void luaL_checkany(lua_State* L, int narg)
@@ -352,6 +351,22 @@ const char* luaL_typename(lua_State* L, int idx)
 {
     const TValue* obj = luaA_toobject(L, idx);
     return obj ? luaT_objtypename(L, obj) : "no value";
+}
+
+int luaL_callyieldable(lua_State* L, int nargs, int nresults)
+{
+    LUAU_ASSERT(FFlag::LuauYieldableContinuations);
+
+    api_check(L, iscfunction(L->ci->func));
+    Closure* cl = clvalue(L->ci->func);
+    api_check(L, cl->c.cont);
+
+    lua_call(L, nargs, nresults);
+
+    if (L->status == LUA_YIELD || L->status == LUA_BREAK)
+        return -1; // -1 is a marker for yielding from C
+
+    return cl->c.cont(L, LUA_OK);
 }
 
 /*

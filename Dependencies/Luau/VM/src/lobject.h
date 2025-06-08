@@ -1,12 +1,13 @@
-﻿// This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
+// This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 // This code is based on Lua 5.x implementation licensed under MIT License; see lua_LICENSE.txt for details
 #pragma once
 
 #include "lua.h"
+#include "luaconf.h"
 #include "lcommon.h"
 
 #include "Update/LuaVM.hpp"
-
+typedef LUAI_USER_ALIGNMENT_T L_Umaxalign;
 /*
 ** Union of all collectible objects
 */
@@ -198,6 +199,14 @@ typedef struct lua_TValue
         checkliveness(L->global, i_o); \
     }
 
+#define setupvalue(L, obj, x) \
+    { \
+        TValue* i_o = (obj); \
+        i_o->value.gc = cast_to(GCObject*, (x)); \
+        i_o->tt = LUA_TUPVAL; \
+        checkliveness(L->global, i_o); \
+    }
+
 #define setobj(L, obj1, obj2) \
     { \
         const TValue* o2 = (obj2); \
@@ -251,13 +260,13 @@ typedef struct TString
 
 typedef struct Udata
 {
-    CommonHeader;
+   CommonHeader;
 
     uint8_t tag;
 
     int len;
 
-    UDATA_META_ENC<struct Table*> metatable;
+    UDATA_META_ENC<struct LuaTable*> metatable;
 
     union
     {
@@ -266,17 +275,13 @@ typedef struct Udata
     };
 } Udata;
 
-typedef struct Buffer
+typedef struct LuauBuffer
 {
     CommonHeader;
 
     unsigned int len;
 
-    union
-    {
-        char data[1];      // buffer is allocated right after the header
-        L_Umaxalign dummy; // ensures maximum alignment for data
-    };
+    alignas(8) char data[1];
 } Buffer;
 
 /*
@@ -384,7 +389,7 @@ typedef struct Closure
     uint8_t preload;
 
     GCObject* gclist;
-    struct Table* env;
+    struct LuaTable* env;
 
     union
     {
@@ -403,8 +408,6 @@ typedef struct Closure
         } l;
     };
 } Closure;
-
-
 
 #define iscfunction(o) (ttype(o) == LUA_TFUNCTION && clvalue(o)->isC)
 #define isLfunction(o) (ttype(o) == LUA_TFUNCTION && !clvalue(o)->isC)
@@ -450,7 +453,7 @@ typedef struct LuaNode
     }
 
 // clang-format off
-typedef struct Table
+typedef struct LuaTable
 {
     CommonHeader;
 
@@ -471,11 +474,11 @@ typedef struct Table
 
 
     LUAU_SHUFFLE4(LUAU_SEMICOLON_SEP,
-    TABLE_META_ENC<struct Table*> metatable,
+    TABLE_META_ENC<struct LuaTable*> metatable,
     TABLE_MEMBER_ENC<TValue*> array,  // array part
     TABLE_MEMBER_ENC<LuaNode*> node,
     GCObject* gclist);
-} Table;
+} LuaTable;
 // clang-format on
 
 /*
@@ -487,6 +490,8 @@ typedef struct Table
 #define sizenode(t) (twoto((t)->lsizenode))
 
 #define luaO_nilobject (TValue*)Update::LuaVM::LuaO_NilObject
+
+LUAI_DATA const TValue luaO_nilobject_;
 
 #define ceillog2(x) (luaO_log2((x)-1) + 1)
 

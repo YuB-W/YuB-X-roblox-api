@@ -12,11 +12,16 @@
 #include <string.h>
 #include <stdio.h>
 
+LUAU_FASTFLAGVARIABLE(LuauCurrentLineBounds)
+
 static const char* getfuncname(Closure* f);
 
 static int currentpc(lua_State* L, CallInfo* ci)
 {
-    return pcRel(ci->savedpc, ci_func(ci)->l.p);
+    if (FFlag::LuauCurrentLineBounds)
+        return pcRel(ci->savedpc, ci_func(ci)->l.p);
+    else
+        return pcRel_DEPRECATED(ci->savedpc, ci_func(ci)->l.p);
 }
 
 static int currentline(lua_State* L, CallInfo* ci)
@@ -420,6 +425,20 @@ int luaG_isnative(lua_State* L, int level)
 
     CallInfo* ci = L->ci - level;
     return (ci->flags & LUA_CALLINFO_NATIVE) != 0 ? 1 : 0;
+}
+
+int luaG_hasnative(lua_State* L, int level)
+{
+    if (unsigned(level) >= unsigned(L->ci - L->base_ci))
+        return 0;
+
+    CallInfo* ci = L->ci - level;
+
+    Proto* proto = getluaproto(ci);
+    if (proto == nullptr)
+        return 0;
+
+    return (proto->execdata != nullptr);
 }
 
 void lua_singlestep(lua_State* L, int enabled)

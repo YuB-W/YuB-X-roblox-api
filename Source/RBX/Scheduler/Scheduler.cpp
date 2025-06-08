@@ -129,7 +129,7 @@ void CScheduler::BlacklistBadJobs() {
         lua_State* ExploitThread = Execution->NewThread(L);
 
         lua_pushvalue(L, LUA_REGISTRYINDEX);
-        Table* registry = hvalue(index2addr(L, -1));
+        LuaTable* registry = hvalue(index2addr(L, -1));
         int regSize = registry ? registry->sizearray : -1;
 
         if (registry && regSize == 4) {

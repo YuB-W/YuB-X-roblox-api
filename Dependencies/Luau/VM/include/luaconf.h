@@ -3,7 +3,6 @@
 #pragma once
 
 #include "Update/LuaVM.hpp"
-
 // When debugging complex issues, consider enabling one of these:
 // This will reallocate the stack very aggressively at every opportunity; use this with asan to catch stale stack pointers
 // #define HARDSTACKTESTS 1
@@ -130,13 +129,6 @@
 
 // }==================================================================
 
-/*
-@@ LUAI_USER_ALIGNMENT_T is a type that requires maximum alignment.
-** CHANGE it if your system requires alignments larger than double. (For
-** instance, if your system supports long doubles and they must be
-** aligned in 16-byte boundaries, then you should add long double in the
-** union.) Probably you do not need to change this.
-*/
 #define LUAI_USER_ALIGNMENT_T \
     union \
     { \

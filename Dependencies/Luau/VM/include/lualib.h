@@ -3,8 +3,6 @@
 #pragma once
 
 #include "lua.h"
-#include "../src/lstate.h"
-#include "../src/lobject.h"
 
 #define luaL_error(L, fmt, ...) luaL_errorL(L, fmt, ##__VA_ARGS__)
 #define luaL_typeerror(L, narg, tname) luaL_typeerrorL(L, narg, tname)
@@ -17,9 +15,6 @@ struct luaL_Reg
 };
 typedef struct luaL_Reg luaL_Reg;
 
-LUALIB_API const char* currfuncname(lua_State* L);
-
-LUALIB_API int libsize(const luaL_Reg* l);
 LUALIB_API void luaL_register(lua_State* L, const char* libname, const luaL_Reg* l);
 LUALIB_API int luaL_getmetafield(lua_State* L, int obj, const char* e);
 LUALIB_API int luaL_callmeta(lua_State* L, int obj, const char* e);
@@ -43,7 +38,6 @@ LUALIB_API const float* luaL_optvector(lua_State* L, int narg, const float* def)
 
 LUALIB_API void luaL_checkstack(lua_State* L, int sz, const char* msg);
 LUALIB_API void luaL_checktype(lua_State* L, int narg, int t);
-LUALIB_API void luaL_checktypes(lua_State* L, int narg, int t1, int t2);
 LUALIB_API void luaL_checkany(lua_State* L, int narg);
 
 LUALIB_API int luaL_newmetatable(lua_State* L, const char* tname);
@@ -63,6 +57,9 @@ LUALIB_API lua_State* luaL_newstate(void);
 LUALIB_API const char* luaL_findtable(lua_State* L, int idx, const char* fname, int szhint);
 
 LUALIB_API const char* luaL_typename(lua_State* L, int idx);
+
+// wrapper for making calls from yieldable C functions
+LUALIB_API int luaL_callyieldable(lua_State* L, int nargs, int nresults);
 
 /*
 ** ===============================================================
@@ -141,6 +138,9 @@ LUALIB_API int luaopen_math(lua_State* L);
 
 #define LUA_DBLIBNAME "debug"
 LUALIB_API int luaopen_debug(lua_State* L);
+
+#define LUA_VECLIBNAME "vector"
+LUALIB_API int luaopen_vector(lua_State* L);
 
 // open all builtin libraries
 LUALIB_API void luaL_openlibs(lua_State* L);

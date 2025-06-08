@@ -14,6 +14,9 @@
 #include <string.h>
 #include <stdio.h>
 
+LUAU_FASTFLAG(LuauCurrentLineBounds)
+LUAU_FASTFLAGVARIABLE(LuauHeapNameDetails)
+
 static void validateobjref(global_State* g, GCObject* f, GCObject* t)
 {
     LUAU_ASSERT(!isdead(g, t));
@@ -34,7 +37,7 @@ static void validateref(global_State* g, GCObject* f, TValue* v)
     }
 }
 
-static void validatetable(global_State* g, Table* h)
+static void validatetable(global_State* g, LuaTable* h)
 {
     int sizenode = 1 << h->lsizenode;
 
@@ -290,13 +293,13 @@ static void dumpstring(FILE* f, TString* ts)
     fprintf(f, "\"}");
 }
 
-static void dumptable(FILE* f, Table* h)
+static void dumptable(FILE* f, LuaTable* h)
 {
-    size_t size = sizeof(Table) + (h->node == dummynode ? 0 : sizenode(h) * sizeof(LuaNode)) + h->sizearray * sizeof(TValue);
+    size_t size = sizeof(LuaTable) + (h->node == &luaH_dummynode ? 0 : sizenode(h) * sizeof(LuaNode)) + h->sizearray * sizeof(TValue);
 
     fprintf(f, "{\"type\":\"table\",\"cat\":%d,\"size\":%d", h->memcat, int(size));
 
-    if (h->node != dummynode)
+    if (h->node != &luaH_dummynode)
     {
         fprintf(f, ",\"pairs\":[");
 
@@ -462,7 +465,7 @@ static void dumpthread(FILE* f, lua_State* th)
             else if (isLua(ci))
             {
                 Proto* p = ci_func(ci)->l.p;
-                int pc = pcRel(ci->savedpc, p);
+                int pc = FFlag::LuauCurrentLineBounds ? pcRel(ci->savedpc, p) : pcRel_DEPRECATED(ci->savedpc, p);
                 const LocVar* var = luaF_findlocal(p, int(v - ci->base), pc);
 
                 if (var && var->varname)
@@ -654,14 +657,14 @@ static void enumstring(EnumContext* ctx, TString* ts)
     enumnode(ctx, obj2gco(ts), ts->len, NULL);
 }
 
-static void enumtable(EnumContext* ctx, Table* h)
+static void enumtable(EnumContext* ctx, LuaTable* h)
 {
-    size_t size = sizeof(Table) + (h->node == dummynode ? 0 : sizenode(h) * sizeof(LuaNode)) + h->sizearray * sizeof(TValue);
+    size_t size = sizeof(LuaTable) + (h->node == &luaH_dummynode ? 0 : sizenode(h) * sizeof(LuaNode)) + h->sizearray * sizeof(TValue);
 
     // Provide a name for a special registry table
     enumnode(ctx, obj2gco(h), size, h == hvalue(registry(ctx->L)) ? "registry" : NULL);
 
-    if (h->node != dummynode)
+    if (h->node != &luaH_dummynode)
     {
         bool weakkey = false;
         bool weakvalue = false;
@@ -726,10 +729,20 @@ static void enumclosure(EnumContext* ctx, Closure* cl)
 
         char buf[LUA_IDSIZE];
 
-        if (p->source)
-            snprintf(buf, sizeof(buf), "%s:%d %s", p->debugname ? getstr(p->debugname) : "", p->linedefined, getstr(p->source));
+        if (FFlag::LuauHeapNameDetails)
+        {
+            if (p->source)
+                snprintf(buf, sizeof(buf), "%s:%d %s", p->debugname ? getstr(p->debugname) : "unnamed", p->linedefined, getstr(p->source));
+            else
+                snprintf(buf, sizeof(buf), "%s:%d", p->debugname ? getstr(p->debugname) : "unnamed", p->linedefined);
+        }
         else
-            snprintf(buf, sizeof(buf), "%s:%d", p->debugname ? getstr(p->debugname) : "", p->linedefined);
+        {
+            if (p->source)
+                snprintf(buf, sizeof(buf), "%s:%d %s", p->debugname ? getstr(p->debugname) : "", p->linedefined, getstr(p->source));
+            else
+                snprintf(buf, sizeof(buf), "%s:%d", p->debugname ? getstr(p->debugname) : "", p->linedefined);
+        }
 
         enumnode(ctx, obj2gco(cl), sizeLclosure(cl->nupvalues), buf);
     }
@@ -754,9 +767,9 @@ static void enumudata(EnumContext* ctx, Udata* u)
 {
     const char* name = NULL;
 
-    if (Table* h = u->metatable)
+    if (LuaTable* h = u->metatable)
     {
-        if (h->node != dummynode)
+        if (h->node != &luaH_dummynode)
         {
             for (int i = 0; i < sizenode(h); ++i)
             {
@@ -797,10 +810,21 @@ static void enumthread(EnumContext* ctx, lua_State* th)
 
         char buf[LUA_IDSIZE];
 
-        if (p->source)
-            snprintf(buf, sizeof(buf), "%s:%d %s", p->debugname ? getstr(p->debugname) : "", p->linedefined, getstr(p->source));
+        if (FFlag::LuauHeapNameDetails)
+        {
+            if (p->source)
+                snprintf(buf, sizeof(buf), "thread at %s:%d %s", p->debugname ? getstr(p->debugname) : "unnamed", p->linedefined, getstr(p->source));
+            else
+                snprintf(buf, sizeof(buf), "thread at %s:%d", p->debugname ? getstr(p->debugname) : "unnamed", p->linedefined);
+        }
         else
-            snprintf(buf, sizeof(buf), "%s:%d", p->debugname ? getstr(p->debugname) : "", p->linedefined);
+        {
+
+            if (p->source)
+                snprintf(buf, sizeof(buf), "%s:%d %s", p->debugname ? getstr(p->debugname) : "", p->linedefined, getstr(p->source));
+            else
+                snprintf(buf, sizeof(buf), "%s:%d", p->debugname ? getstr(p->debugname) : "", p->linedefined);
+        }
 
         enumnode(ctx, obj2gco(th), size, buf);
     }
@@ -833,7 +857,21 @@ static void enumproto(EnumContext* ctx, Proto* p)
         ctx->edge(ctx->context, enumtopointer(obj2gco(p)), p->execdata, "[native]");
     }
 
-    enumnode(ctx, obj2gco(p), size, p->source ? getstr(p->source) : NULL);
+    if (FFlag::LuauHeapNameDetails)
+    {
+        char buf[LUA_IDSIZE];
+
+        if (p->source)
+            snprintf(buf, sizeof(buf), "proto %s:%d %s", p->debugname ? getstr(p->debugname) : "unnamed", p->linedefined, getstr(p->source));
+        else
+            snprintf(buf, sizeof(buf), "proto %s:%d", p->debugname ? getstr(p->debugname) : "unnamed", p->linedefined);
+
+        enumnode(ctx, obj2gco(p), size, buf);
+    }
+    else
+    {
+        enumnode(ctx, obj2gco(p), size, p->source ? getstr(p->source) : NULL);
+    }
 
     if (p->sizek)
         enumedges(ctx, obj2gco(p), p->k, p->sizek, "constants");

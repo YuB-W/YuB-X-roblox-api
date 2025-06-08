@@ -204,8 +204,10 @@
     <ClInclude Include="Dependencies\curl\include\curl\urlapi.h" />
     <ClInclude Include="Dependencies\curl\include\curl\websockets.h" />
     <ClInclude Include="Dependencies\httplib\httplib.hpp" />
+    <ClInclude Include="Dependencies\Luau\Ast\include\Luau\Allocator.h" />
     <ClInclude Include="Dependencies\Luau\Ast\include\Luau\Ast.h" />
     <ClInclude Include="Dependencies\Luau\Ast\include\Luau\Confusables.h" />
+    <ClInclude Include="Dependencies\Luau\Ast\include\Luau\Cst.h" />
     <ClInclude Include="Dependencies\Luau\Ast\include\Luau\Lexer.h" />
     <ClInclude Include="Dependencies\Luau\Ast\include\Luau\Location.h" />
     <ClInclude Include="Dependencies\Luau\Ast\include\Luau\ParseOptions.h" />
@@ -294,8 +296,10 @@
     <ClCompile Include="Dependencies\cpr\src\ssl_options.cpp" />
     <ClCompile Include="Dependencies\cpr\src\timeout.cpp" />
     <ClCompile Include="Dependencies\cpr\src\util.cpp" />
+    <ClCompile Include="Dependencies\Luau\Ast\src\Allocator.cpp" />
     <ClCompile Include="Dependencies\Luau\Ast\src\Ast.cpp" />
     <ClCompile Include="Dependencies\Luau\Ast\src\Confusables.cpp" />
+    <ClCompile Include="Dependencies\Luau\Ast\src\Cst.cpp" />
     <ClCompile Include="Dependencies\Luau\Ast\src\Lexer.cpp" />
     <ClCompile Include="Dependencies\Luau\Ast\src\Location.cpp" />
     <ClCompile Include="Dependencies\Luau\Ast\src\Parser.cpp" />
@@ -340,6 +344,7 @@
     <ClCompile Include="Dependencies\Luau\VM\src\ltm.cpp" />
     <ClCompile Include="Dependencies\Luau\VM\src\ludata.cpp" />
     <ClCompile Include="Dependencies\Luau\VM\src\lutf8lib.cpp" />
+    <ClCompile Include="Dependencies\Luau\VM\src\lveclib.cpp" />
     <ClCompile Include="Dependencies\Luau\VM\src\lvmexecute.cpp" />
     <ClCompile Include="Dependencies\Luau\VM\src\lvmload.cpp" />
     <ClCompile Include="Dependencies\Luau\VM\src\lvmutils.cpp" />

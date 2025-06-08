@@ -17,6 +17,11 @@
 
 #include <string.h>
 
+LUAU_FASTFLAGVARIABLE(LuauYieldableContinuations)
+
+// keep max stack allocation request under 1GB
+#define MAX_STACK_SIZE (int(1024 / sizeof(TValue)) * 1024 * 1024)
+
 /*
 ** {======================================================
 ** Error-recovery functions
@@ -68,6 +73,52 @@ l_noret luaD_throw(lua_State* L, int errcode)
     abort();
 }
 #else
+class lua_exception : public std::exception
+{
+public:
+    lua_exception(lua_State* L, int status)
+        : L(L)
+        , status(status)
+    {
+    }
+
+    const char* what() const throw() override
+    {
+        // LUA_ERRRUN passes error object on the stack
+        if (status == LUA_ERRRUN)
+            if (const char* str = lua_tostring(L, -1))
+                return str;
+
+        switch (status)
+        {
+        case LUA_ERRRUN:
+            return "lua_exception: runtime error";
+        case LUA_ERRSYNTAX:
+            return "lua_exception: syntax error";
+        case LUA_ERRMEM:
+            return "lua_exception: " LUA_MEMERRMSG;
+        case LUA_ERRERR:
+            return "lua_exception: " LUA_ERRERRMSG;
+        default:
+            return "lua_exception: unexpected exception status";
+        }
+    }
+
+    int getStatus() const
+    {
+        return status;
+    }
+
+    const lua_State* getThread() const
+    {
+        return L;
+    }
+
+private:
+    lua_State* L;
+    int status;
+};
+
 int luaD_rawrunprotected(lua_State* L, Pfunc f, void* ud)
 {
     int status = 0;
@@ -128,8 +179,24 @@ static void correctstack(lua_State* L, TValue* oldstack)
     L->base = (L->base - oldstack) + L->stack;
 }
 
-void luaD_reallocstack(lua_State* L, int newsize)
+void luaD_reallocstack(lua_State* L, int newsize, int fornewci)
 {
+    // throw 'out of memory' error because space for a custom error message cannot be guaranteed here
+    if (newsize > MAX_STACK_SIZE)
+    {
+        // reallocation was performed to setup a new CallInfo frame, which we have to remove
+        if (fornewci)
+        {
+            CallInfo* cip = L->ci - 1;
+
+            L->ci = cip;
+            L->base = cip->base;
+            L->top = cip->top;
+        }
+
+        luaD_throw(L, LUA_ERRMEM);
+    }
+
     TValue* oldstack = L->stack;
     int realsize = newsize + EXTRA_STACK;
     LUAU_ASSERT(L->stack_last - L->stack == L->stacksize - EXTRA_STACK);
@@ -153,10 +220,7 @@ void luaD_reallocCI(lua_State* L, int newsize)
 
 void luaD_growstack(lua_State* L, int n)
 {
-    if (n <= L->stacksize) // double size is enough?
-        luaD_reallocstack(L, 2 * L->stacksize);
-    else
-        luaD_reallocstack(L, L->stacksize + n);
+    luaD_reallocstack(L, getgrownstacksize(L, n), 0);
 }
 
 CallInfo* luaD_growCI(lua_State* L)
@@ -198,24 +262,79 @@ void luaD_call(lua_State* L, StkId func, int nresults)
     if (++L->nCcalls >= LUAI_MAXCCALLS)
         luaD_checkCstack(L);
 
-    ptrdiff_t old_func = savestack(L, func);
+    if (FFlag::LuauYieldableContinuations)
+    {
+        // when called from a yieldable C function, maintain yieldable invariant (baseCcalls <= nCcalls)
+        bool fromyieldableccall = false;
 
-    if (luau_precall(L, func, nresults) == PCRLUA)
-    {                                        // is a Lua function?
-        L->ci->flags |= LUA_CALLINFO_RETURN; // luau_execute will stop after returning from the stack frame
+        if (L->ci != L->base_ci)
+        {
+            Closure* ccl = clvalue(L->ci->func);
 
-        bool oldactive = L->isactive;
-        L->isactive = true;
-        luaC_threadbarrier(L);
+            if (ccl->isC && ccl->c.cont)
+            {
+                fromyieldableccall = true;
+                L->baseCcalls++;
+            }
+        }
 
-        luau_execute(L);
+        ptrdiff_t funcoffset = savestack(L, func);
+        ptrdiff_t cioffset = saveci(L, L->ci);
 
-        if (!oldactive)
-            L->isactive = false;
+        if (luau_precall(L, func, nresults) == PCRLUA)
+        {                                        // is a Lua function?
+            L->ci->flags |= LUA_CALLINFO_RETURN; // luau_execute will stop after returning from the stack frame
+
+            bool oldactive = L->isactive;
+            L->isactive = true;
+            luaC_threadbarrier(L);
+
+            luau_execute(L); // call it
+
+            if (!oldactive)
+                L->isactive = false;
+        }
+
+        bool yielded = L->status == LUA_YIELD || L->status == LUA_BREAK;
+
+        if (fromyieldableccall)
+        {
+            // restore original yieldable invariant
+            // in case of an error, this would either be restored by luaD_pcall or the thread would no longer be resumable
+            L->baseCcalls--;
+
+            // on yield, we have to set the CallInfo top of the C function including slots for expected results, to restore later
+            if (yielded)
+            {
+                CallInfo* callerci = restoreci(L, cioffset);
+                callerci->top = restorestack(L, funcoffset) + (nresults != LUA_MULTRET ? nresults : 0);
+            }
+        }
+
+        if (nresults != LUA_MULTRET && !yielded)
+            L->top = restorestack(L, funcoffset) + nresults;
     }
+    else
+    {
+        ptrdiff_t old_func = savestack(L, func);
 
-    if (nresults != LUA_MULTRET)
-        L->top = restorestack(L, old_func) + nresults;
+        if (luau_precall(L, func, nresults) == PCRLUA)
+        {                                        // is a Lua function?
+            L->ci->flags |= LUA_CALLINFO_RETURN; // luau_execute will stop after returning from the stack frame
+
+            bool oldactive = L->isactive;
+            L->isactive = true;
+            luaC_threadbarrier(L);
+
+            luau_execute(L); // call it
+
+            if (!oldactive)
+                L->isactive = false;
+        }
+
+        if (nresults != LUA_MULTRET)
+            L->top = restorestack(L, old_func) + nresults;
+    }
 
     L->nCcalls--;
     luaC_checkGC(L);
@@ -261,9 +380,18 @@ static void resume_continue(lua_State* L)
             // C continuation; we expect this to be followed by Lua continuations
             int n = cl->c.cont(L, 0);
 
-            // Continuation can break again
-            if (L->status == LUA_BREAK)
-                break;
+            if (FFlag::LuauYieldableContinuations)
+            {
+                // continuation can break or yield again
+                if (L->status == LUA_BREAK || L->status == LUA_YIELD)
+                    break;
+            }
+            else
+            {
+                // Continuation can break again
+                if (L->status == LUA_BREAK)
+                    break;
+            }
 
             luau_poscall(L, L->top - n);
         }
@@ -307,6 +435,11 @@ static void resume(lua_State* L, void* ud)
             {
                 // finish interrupted execution of `OP_CALL'
                 luau_poscall(L, firstArg);
+            }
+            else if (FFlag::LuauYieldableContinuations)
+            {
+                // restore arguments we have protected for C continuation
+                L->base = L->ci->base;
             }
         }
         else
@@ -381,9 +514,9 @@ static void resume_handle(lua_State* L, void* ud)
     resume_continue(L);
 }
 
-static int resume_error(lua_State* L, const char* msg)
+static int resume_error(lua_State* L, const char* msg, int narg)
 {
-    L->top = L->ci->base;
+    L->top -= narg;
     setsvalue(L, L->top, luaS_new(L, msg));
     incr_top(L);
     return LUA_ERRRUN;
@@ -409,13 +542,14 @@ static void resume_finish(lua_State* L, int status)
 int lua_resume(lua_State* L, lua_State* from, int nargs)
 {
     api_check(L, L->top - L->base >= nargs);
+
     int status;
     if (L->status != LUA_YIELD && L->status != LUA_BREAK && (L->status != 0 || L->ci != L->base_ci))
-        return resume_error(L, "cannot resume non-suspended coroutine");
+        return resume_error(L, "cannot resume non-suspended coroutine", nargs);
 
     L->nCcalls = from ? from->nCcalls : 0;
     if (L->nCcalls >= LUAI_MAXCCALLS)
-        return resume_error(L, "C stack overflow");
+        return resume_error(L, "C stack overflow", nargs);
 
     L->baseCcalls = ++L->nCcalls;
     L->isactive = true;
@@ -438,13 +572,15 @@ int lua_resume(lua_State* L, lua_State* from, int nargs)
 
 int lua_resumeerror(lua_State* L, lua_State* from)
 {
+    api_check(L, L->top - L->base >= 1);
+
     int status;
     if (L->status != LUA_YIELD && L->status != LUA_BREAK && (L->status != 0 || L->ci != L->base_ci))
-        return resume_error(L, "cannot resume non-suspended coroutine");
+        return resume_error(L, "cannot resume non-suspended coroutine", 1);
 
     L->nCcalls = from ? from->nCcalls : 0;
     if (L->nCcalls >= LUAI_MAXCCALLS)
-        return resume_error(L, "C stack overflow");
+        return resume_error(L, "C stack overflow", 1);
 
     L->baseCcalls = ++L->nCcalls;
     L->isactive = true;
@@ -511,6 +647,7 @@ static void restore_stack_limit(lua_State* L)
 int luaD_pcall(lua_State* L, Pfunc func, void* u, ptrdiff_t old_top, ptrdiff_t ef)
 {
     unsigned short oldnCcalls = L->nCcalls;
+    unsigned short oldbaseCcalls = FFlag::LuauYieldableContinuations ? L->baseCcalls : 0;
     ptrdiff_t old_ci = saveci(L, L->ci);
     bool oldactive = L->isactive;
     int status = luaD_rawrunprotected(L, func, u);
@@ -546,6 +683,9 @@ int luaD_pcall(lua_State* L, Pfunc func, void* u, ptrdiff_t old_top, ptrdiff_t e
 
         // restore nCcalls before calling the debugprotectederror callback which may rely on the proper value to have been restored.
         L->nCcalls = oldnCcalls;
+
+        if (FFlag::LuauYieldableContinuations)
+            L->baseCcalls = oldbaseCcalls;
 
         // an error occurred, check if we have a protected error callback
         if (yieldable && L->global->cb.debugprotectederror)

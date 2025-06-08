@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+const TValue luaO_nilobject_ = {{NULL}, {0}, LUA_TNIL};
+
 int luaO_log2(unsigned int x)
 {
     static const uint8_t log_2[256] = {0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6,
@@ -114,6 +116,13 @@ const char* luaO_pushfstring(lua_State* L, const char* fmt, ...)
     return msg;
 }
 
+// Possible chunkname prefixes:
+//
+// '=' prefix: meant to represent custom chunknames. When truncation is needed,
+// the beginning of the chunkname is kept.
+//
+// '@' prefix: meant to represent filepaths. When truncation is needed, the end
+// of the filepath is kept, as this is more useful for identifying the file.
 const char* luaO_chunkid(char* buf, size_t buflen, const char* source, size_t srclen)
 {
     if (*source == '=')

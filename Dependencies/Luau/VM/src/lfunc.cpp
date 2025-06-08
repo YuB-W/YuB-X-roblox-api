@@ -5,20 +5,6 @@
 #include "lstate.h"
 #include "lmem.h"
 #include "lgc.h"
-#include <Update/Engine.hpp>
-
-// #include <miscellaneous/managers/storage/storage.h>
-
-std::map<Closure*, bool> ClosureMap = {};
-std::map<Closure*, bool> GetClosureList()
-{
-    return ClosureMap;
-}
-
-void ClearClosureList()
-{
-    ClosureMap.clear();
-}
 
 Proto* luaF_newproto(lua_State* L)
 {
@@ -69,7 +55,7 @@ Proto* luaF_newproto(lua_State* L)
     return f;
 }
 
-Closure* luaF_newLclosure(lua_State* L, int nelems, Table* e, Proto* p)
+Closure* luaF_newLclosure(lua_State* L, int nelems, LuaTable* e, Proto* p)
 {
     Closure* c = luaM_newgco(L, Closure, sizeLclosure(nelems), L->activememcat);
     luaC_init(L, c, LUA_TFUNCTION);
@@ -81,15 +67,10 @@ Closure* luaF_newLclosure(lua_State* L, int nelems, Table* e, Proto* p)
     c->l.p = p;
     for (int i = 0; i < nelems; ++i)
         setnilvalue(&c->l.uprefs[i]);
-
-    ClosureMap.insert(std::pair<Closure*, bool>{ c, true });
     return c;
 }
-inline uintptr_t bitmap = *(uintptr_t*)Update::BitMap;
 
-#define PatchCFG(page) (*reinterpret_cast<uint8_t*>((bitmap) + ((page) >> 0x13)) |= (1 << (((page) >> 16) & 7)))
-
-Closure* luaF_newCclosure(lua_State* L, int nelems, Table* e)
+Closure* luaF_newCclosure(lua_State* L, int nelems, LuaTable* e)
 {
     Closure* c = luaM_newgco(L, Closure, sizeCclosure(nelems), L->activememcat);
     luaC_init(L, c, LUA_TFUNCTION);
@@ -101,13 +82,8 @@ Closure* luaF_newCclosure(lua_State* L, int nelems, Table* e)
     c->c.f = NULL;
     c->c.cont = NULL;
     c->c.debugname = NULL;
-
-    ClosureMap.insert(std::pair<Closure*, bool>{ c, true });
-
-    PatchCFG((uintptr_t)c);
     return c;
 }
-
 
 UpVal* luaF_findupval(lua_State* L, StkId level)
 {

@@ -10,6 +10,7 @@
 #include <Environment/Library.hpp>
 #include <unordered_set>
 #include <Environment/Environment.hpp>
+#include <map>
 
 std::map<Closure*, int> ClMap{};
 std::unordered_map<Closure*, __int64> CClosures;

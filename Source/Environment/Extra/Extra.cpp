@@ -158,57 +158,6 @@ int custom_getinstancelist(lua_State* L) {
 	return 1;
 };
 
-auto getnilinstances(lua_State* rl) -> int
-{
-	struct instance_context {
-		lua_State* rl;
-		std::intptr_t n;
-	} context = { rl, 0 };
-
-	lua_newtable(rl);
-
-	for (lua_Page* page = rl->global->allgcopages; page;) {
-		lua_Page* next{ page->listnext };
-
-		luaM_visitpage(page, &context,
-			[](void* context, lua_Page* page, GCObject* gco) -> bool {
-				instance_context* gcContext{ reinterpret_cast<instance_context*>(context) };
-				auto type = gco->gch.tt;
-
-				if (type == LUA_TUSERDATA) {
-
-
-					TValue* top = gcContext->rl->top;
-					top->value.p = reinterpret_cast<void*>(gco);
-					top->tt = type;
-					gcContext->rl->top++;
-
-					if (!strcmp(luaL_typename(gcContext->rl, -1), "Instance")) {
-						lua_getfield(gcContext->rl, -1, "Parent");
-						bool nullParent = lua_isnoneornil(gcContext->rl, -1);
-
-						if (nullParent) {
-							lua_pop(gcContext->rl, 1);
-							gcContext->n++;
-							lua_rawseti(gcContext->rl, -2, gcContext->n);
-						}
-						else {
-							lua_pop(gcContext->rl, 2);
-						}
-					}
-					else {
-						lua_pop(gcContext->rl, 1);
-					}
-				}
-
-				return true;
-			}
-		);
-
-		page = next;
-	}
-	return 1;
-}
 
 
 

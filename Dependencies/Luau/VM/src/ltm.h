@@ -11,7 +11,8 @@
 // clang-format off
 typedef enum
 {
-    LUAU_SHUFFLE7(LUAU_COMMA_SEP,
+    
+   LUAU_SHUFFLE7(LUAU_COMMA_SEP,
     TM_INDEX,
     TM_NEWINDEX,
     TM_MODE,
@@ -51,7 +52,7 @@ typedef enum
 LUAI_DATA const char* const luaT_typenames[];
 LUAI_DATA const char* const luaT_eventname[];
 
-LUAI_FUNC const TValue* luaT_gettm(Table* events, TMS event, TString* ename);
+LUAI_FUNC const TValue* luaT_gettm(LuaTable* events, TMS event, TString* ename);
 LUAI_FUNC const TValue* luaT_gettmbyobj(lua_State* L, const TValue* o, TMS event);
 
 LUAI_FUNC const TString* luaT_objtypenamestr(lua_State* L, const TValue* o);

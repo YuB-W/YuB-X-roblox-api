@@ -28,8 +28,7 @@
 // Upvalues: 0-199. Upvalues refer to the values stored in the closure object.
 // Constants: 0-2^23-1. Constants are stored in a table allocated with each proto; to allow for future bytecode tweaks the encodable value is limited to 23 bits.
 // Closures: 0-2^15-1. Closures are created from child protos via a child index; the limit is for the number of closures immediately referenced in each function.
-// Jumps: -2^23..2^23. Jump offsets are specified in word increments, so jumping over an instruction may sometimes 
-// an offset of 2 or more. Note that for jump instructions with AUX, the AUX word is included as part of the jump offset.
+// Jumps: -2^23..2^23. Jump offsets are specified in word increments, so jumping over an instruction may sometimes require an offset of 2 or more. Note that for jump instructions with AUX, the AUX word is included as part of the jump offset.
 
 // # Bytecode versions
 // Bytecode serialized format embeds a version number, that dictates both the serialized form as well as the allowed instructions. As long as the bytecode version falls into supported
@@ -442,7 +441,7 @@ enum LuauBytecodeTag
     // Bytecode version; runtime supports [MIN, MAX], compiler emits TARGET by default but may emit a higher version when flags are enabled
     LBC_VERSION_MIN = 3,
     LBC_VERSION_MAX = 6,
-    LBC_VERSION_TARGET = 5,
+    LBC_VERSION_TARGET = 6,
     // Type encoding version
     LBC_TYPE_VERSION_MIN = 1,
     LBC_TYPE_VERSION_MAX = 3,
@@ -601,6 +600,22 @@ enum LuauBuiltinFunction
     LBF_BUFFER_WRITEF32,
     LBF_BUFFER_READF64,
     LBF_BUFFER_WRITEF64,
+
+    // vector.
+    LBF_VECTOR_MAGNITUDE,
+    LBF_VECTOR_NORMALIZE,
+    LBF_VECTOR_CROSS,
+    LBF_VECTOR_DOT,
+    LBF_VECTOR_FLOOR,
+    LBF_VECTOR_CEIL,
+    LBF_VECTOR_ABS,
+    LBF_VECTOR_SIGN,
+    LBF_VECTOR_CLAMP,
+    LBF_VECTOR_MIN,
+    LBF_VECTOR_MAX,
+
+    // math.lerp
+    LBF_MATH_LERP,
 };
 
 // Capture type, used in LOP_CAPTURE

@@ -116,7 +116,9 @@ public:
     Position openGenericsPosition{0, 0};
     AstArray<Position> genericsCommaPositions;
     Position closeGenericsPosition{0, 0};
+    AstArray<Position> argsAnnotationColonPositions;
     AstArray<Position> argsCommaPositions;
+    Position varargAnnotationColonPosition{0, 0};
     Position returnSpecifierPosition{0, 0};
 };
 
@@ -224,8 +226,9 @@ class CstStatLocal : public CstNode
 public:
     LUAU_CST_RTTI(CstStatLocal)
 
-    CstStatLocal(AstArray<Position> varsCommaPositions, AstArray<Position> valuesCommaPositions);
+    CstStatLocal(AstArray<Position> varsAnnotationColonPositions, AstArray<Position> varsCommaPositions, AstArray<Position> valuesCommaPositions);
 
+    AstArray<Position> varsAnnotationColonPositions;
     AstArray<Position> varsCommaPositions;
     AstArray<Position> valuesCommaPositions;
 };
@@ -235,8 +238,9 @@ class CstStatFor : public CstNode
 public:
     LUAU_CST_RTTI(CstStatFor)
 
-    CstStatFor(Position equalsPosition, Position endCommaPosition, std::optional<Position> stepCommaPosition);
+    CstStatFor(Position annotationColonPosition, Position equalsPosition, Position endCommaPosition, std::optional<Position> stepCommaPosition);
 
+    Position annotationColonPosition;
     Position equalsPosition;
     Position endCommaPosition;
     std::optional<Position> stepCommaPosition;
@@ -247,8 +251,9 @@ class CstStatForIn : public CstNode
 public:
     LUAU_CST_RTTI(CstStatForIn)
 
-    CstStatForIn(AstArray<Position> varsCommaPositions, AstArray<Position> valuesCommaPositions);
+    CstStatForIn(AstArray<Position> varsAnnotationColonPositions, AstArray<Position> varsCommaPositions, AstArray<Position> valuesCommaPositions);
 
+    AstArray<Position> varsAnnotationColonPositions;
     AstArray<Position> varsCommaPositions;
     AstArray<Position> valuesCommaPositions;
 };
@@ -388,6 +393,7 @@ public:
         std::optional<Position> separatorPosition;
 
         CstExprConstantString* stringInfo = nullptr; // only if Kind == StringProperty
+        Position stringPosition{0, 0};               // only if Kind == StringProperty
     };
 
     CstTypeTable(AstArray<Item> items, bool isArray);
@@ -472,8 +478,10 @@ class CstTypePackExplicit : public CstNode
 public:
     LUAU_CST_RTTI(CstTypePackExplicit)
 
-    CstTypePackExplicit(Position openParenthesesPosition, Position closeParenthesesPosition, AstArray<Position> commaPositions);
+    explicit CstTypePackExplicit();
+    explicit CstTypePackExplicit(Position openParenthesesPosition, Position closeParenthesesPosition, AstArray<Position> commaPositions);
 
+    bool hasParentheses;
     Position openParenthesesPosition;
     Position closeParenthesesPosition;
     AstArray<Position> commaPositions;
