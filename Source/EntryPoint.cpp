@@ -1,233 +1,127 @@
-#define _CRT_SECURE_NO_WARNINGS
+#include "Includes.hpp"
+#include "Scheduler.hpp"
+#include "Execution.hpp"
+#include "Environment.hpp"
+#include "overlay/overlay.hpp"
 
-#include <Environment/Environment.hpp>
-#include "Scheduler/Scheduler.hpp"
-#include <Update/Engine.hpp>
+#pragma comment(lib, "ws2_32.lib")
 
-#include <ThreadPool.hpp>
-#include <inttypes.h>  
-#include "NamedPipe.h"
-#include <RBX.hpp>
+#define PORT "5454"
 
-#include <Windows.h>
-#include <fstream>
-#include <sstream>
-#include <string>
-
-#include <windows.h>
-#include <userenv.h>
-
-
-std::atomic<uintptr_t> lastState{ 0 };
-std::atomic<uintptr_t> lastPlaceId{ 0 };
-std::atomic<bool> teleportMonitoringActive{ true };
-
-uintptr_t GlobalState() {
-    auto ScriptContext = RBX::Scheduler->GetScriptContext();
-    uintptr_t GlobalState = ScriptContext + Update::GlobalState;
-    return GlobalState;
+bool recvAll(SOCKET sock, char* buffer, int totalBytes) {
+    int received = 0;
+    while (received < totalBytes) {
+        int result = recv(sock, buffer + received, totalBytes - received, 0);
+        if (result <= 0) return false;
+        received += result;
+    }
+    return true;
 }
 
-std::string namecallhookscript = R"(
+void ServerThread() {
+    WSADATA wsaData;
+    struct addrinfo* result = nullptr, hints = {};
+    SOCKET ListenSocket = INVALID_SOCKET, ClientSocket = INVALID_SOCKET;
 
-if not game:IsLoaded() then game.Loaded:Wait() end
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) return;
 
-local BlacklistedFunctions = {
-    "OpenVideosFolder",
-    "OpenScreenshotsFolder",
-    "GetRobuxBalance",
-    "PerformPurchase",
-    "PromptBundlePurchase",
-    "PromptNativePurchase",
-    "PromptProductPurchase",
-    "PromptPurchase",
-    "PromptGamePassPurchase",
-    "PromptRobloxPurchase",
-    "PromptThirdPartyPurchase",
-    "Publish",
-    "GetMessageId",
-    "OpenBrowserWindow",
-    "OpenNativeOverlay",
-    "RequestInternal",
-    "ExecuteJavaScript",
-    "EmitHybridEvent",
-    "AddCoreScriptLocal",
-    "HttpRequestAsync",
-    "ReportAbuse",
-    "SaveScriptProfilingData",
-    "OpenUrl",
-    "DeleteCapture",
-    "DeleteCapturesAsync"
-}
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = AI_PASSIVE;
 
-local Metatable = getrawmetatable(game)
-local OldMetatable = Metatable.__namecall
+    if (getaddrinfo(nullptr, PORT, &hints, &result) != 0) {
+        WSACleanup();
+        return;
+    }
 
-setreadonly(Metatable, false)
-Metatable.__namecall = function(Self, ...)
-    local Method = getnamecallmethod()
-   
-    if table.find(BlacklistedFunctions, Method) then
-        
-        return nil
-    end
+    ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (ListenSocket == INVALID_SOCKET) {
+        freeaddrinfo(result);
+        WSACleanup();
+        return;
+    }
 
-    if Method == "HttpGet" or Method == "HttpGetAsync" then
-            return httpget(...)
-    elseif Method == "GetObjects" then 
-            return GetObjects(...)
-    end
+    if (bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR) {
+        closesocket(ListenSocket);
+        freeaddrinfo(result);
+        WSACleanup();
+        return;
+    }
 
-    return OldMetatable(Self, ...)
-end
+    freeaddrinfo(result);
 
-local OldIndex = Metatable.__index
+    if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR) {
+        closesocket(ListenSocket);
+        WSACleanup();
+        return;
+    }
 
-setreadonly(Metatable, false)
-Metatable.__index = function(Self, i)
-    if table.find(BlacklistedFunctions, i) then
-        return nil
-    end
+    while (true) {
+        ClientSocket = accept(ListenSocket, nullptr, nullptr);
+        if (ClientSocket == INVALID_SOCKET) continue;
 
-    if Self == game then
-        if i == "HttpGet" or i == "HttpGetAsync" then 
-            return httpget
-        elseif i == "GetObjects" then 
-            return GetObjects
-        end
-    end
-    return OldIndex(Self, i)
-end
-
-
-function HookMetaMethod(object, metamethodName, hookFunction)
-    local metatable = getmetatable(object)
-    if not metatable then
-        return error("The object does not have a metatable.")
-    end
-
-    local originalMethod = metatable[metamethodName]
-
-    metatable[metamethodName] = function(Self, ...)
-        return hookFunction(Self, originalMethod, ...)
-    end
-end
-
-
-print(identifyexecutor())
-)";
-
-
-void monitor_teleport() {
-    try {
-        uintptr_t DataModel = RBX::Scheduler->GetDataModel();
-        uintptr_t currentPlaceId = *(uintptr_t*)(DataModel + Update::DataModel::PlaceId);
-
-        lastPlaceId.store(currentPlaceId);
-        lastState.store(GlobalState());
-
-        bool teleportedAway = false;
-
-        while (teleportMonitoringActive.load()) {
-            DataModel = RBX::Scheduler->GetDataModel();
-            currentPlaceId = *(uintptr_t*)(DataModel + Update::DataModel::PlaceId);
-            
-            if (currentPlaceId == 0 || GlobalState == 0) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                continue;
-            }
-
-            if (currentPlaceId != lastPlaceId.load() || GlobalState() != lastState.load()) {
-                teleportedAway = true;
-                RBX::Print(0, "Teleport detected. placeId: %" PRIuPTR, currentPlaceId);
-                lastPlaceId.store(currentPlaceId);
-                lastState.store(GlobalState());
-            }
-            else if (teleportedAway && currentPlaceId == lastPlaceId.load() && GlobalState() == lastState.load()) {
-                teleportedAway = false;
-                RBX::Print(0, "Teleport detected. placeId: %" PRIuPTR, currentPlaceId);
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(4000));
-
-                //
-
-                RBX::Scheduler->Initialize();
-
-                uintptr_t StateIndex[] = { 0 };
-                uintptr_t ActorIndex[] = { 0, 0 };
-
-                lua_State* L = RBX::DecryptLuaState(
-                    RBX::GetGlobalState(GlobalState(), StateIndex, ActorIndex) +
-                    Update::EncryptedState
-                );
-
-                lua_State* ExploitThread = Execution->NewThread(L);
-                luaL_sandboxthread(ExploitThread);
-                Manager->SetLuaState(ExploitThread);
-
-                RBX::Scheduler->HookJob("Heartbeat");
-                Environment->Initialize(Manager->GetLuaState());
-
-                Execution->Send(Manager->GetLuaState(), namecallhookscript);
-
-                RBX::Print(0, "YuB-X: Reinitialized after teleport!");
-                //
-            }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        uint32_t scriptSizeNet = 0;
+        if (!recvAll(ClientSocket, reinterpret_cast<char*>(&scriptSizeNet), 4)) {
+            closesocket(ClientSocket);
+            continue;
         }
+
+        uint32_t scriptSize = ntohl(scriptSizeNet);
+        if (scriptSize == 0 || scriptSize > 10 * 1024 * 1024) {
+            closesocket(ClientSocket);
+            continue;
+        }
+
+        std::vector<char> buffer(scriptSize + 1, 0);
+        if (!recvAll(ClientSocket, buffer.data(), scriptSize)) {
+            closesocket(ClientSocket);
+            continue;
+        }
+
+        std::string receivedScript(buffer.data(), scriptSize);
+
+        Execution->Execute(receivedScript);
+        closesocket(ClientSocket);
     }
-    catch (const std::exception& ex) {
-        RBX::Print(1, "Error in teleport monitor: %s\n", ex.what());
-    }
+
+    closesocket(ListenSocket);
+    WSACleanup();
 }
 
-
-void InitializeExploitation() {
-
-    uintptr_t DataModel = RBX::Scheduler->GetDataModel();
-    uintptr_t placeId = *(uintptr_t*)(DataModel + Update::DataModel::PlaceId);
-
-    if (placeId) {
-
-        RBX::Scheduler->Initialize();
-
-        uintptr_t StateIndex[] = { 0 };
-        uintptr_t ActorIndex[] = { 0, 0 };
-
-        lua_State* L = RBX::DecryptLuaState(
-            RBX::GetGlobalState(GlobalState(), StateIndex, ActorIndex) +
-            Update::EncryptedState
-        );
-
-        lua_State* ExploitThread = Execution->NewThread(L);
-        luaL_sandboxthread(ExploitThread);
-        Manager->SetLuaState(ExploitThread);
-
-        RBX::Scheduler->HookJob("Heartbeat");
-        Environment->Initialize(Manager->GetLuaState());
-        Execution->Send(Manager->GetLuaState(), namecallhookscript);
-
-        lastPlaceId.store(placeId);
-        lastState.store(GlobalState());
-    }
-
-   ThreadPool->Run(StartServer);
-   ThreadPool->Run(monitor_teleport);
-}
-
-
-void check_update()
+void disable_flags()
 {
-    RBX::Print(0, "[!] Print Address Works");
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    *reinterpret_cast<BYTE*>(Offsets::InternalFastFlags::EnableLoadModule) = TRUE;
+    *reinterpret_cast<BYTE*>(Offsets::InternalFastFlags::DebugCheckRenderThreading) = FALSE;
+    *reinterpret_cast<BYTE*>(Offsets::InternalFastFlags::RenderDebugCheckThreading2) = FALSE;
+    *reinterpret_cast<BYTE*>(Offsets::InternalFastFlags::DisableCorescriptLoadstring) = FALSE;
+    *reinterpret_cast<BYTE*>(Offsets::InternalFastFlags::LuaStepIntervalMsOverrideEnabled) = FALSE;
+    *reinterpret_cast<BYTE*>(Offsets::InternalFastFlags::LockViolationInstanceCrash) = FALSE;
+}
+
+void Start()
+{
+    disable_flags();
+
+	auto LuaState = Scheduler->GetLuaState();
+
+	LuaState->userdata->Identity = 8;
+	LuaState->userdata->Capabilities = MaxCaps;
+
+	Environment->Initialize(LuaState);
+
+    luaL_sandboxthread(LuaState);
+
+    Execution->Execute("print('YubxInternal Loaded!')");
+    std::thread(gui::overlay::render).detach();
+	while (true) { Sleep(10000); };
 }
 
 BOOL APIENTRY DllMain(HMODULE Module, DWORD Reason, LPVOID Reserved) {
     switch (Reason) {
     case DLL_PROCESS_ATTACH:
         DisableThreadLibraryCalls(Module);
-        ThreadPool->Run(InitializeExploitation);
+        std::thread(InitializeExploitation);
         break;
     }
     return TRUE;
